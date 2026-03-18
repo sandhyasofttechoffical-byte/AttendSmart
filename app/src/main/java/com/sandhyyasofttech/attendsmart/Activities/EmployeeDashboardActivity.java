@@ -726,281 +726,8 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
                 // Convert weekly holiday string to Calendar constants
                 int[] weeklyHolidays = convertDayNameToCalendarArray(weeklyHolidayStr);
 
-                // Now load attendance data
-                attendanceRef.orderByKey().startAt(currentMonth + "-01").endAt(currentMonth + "-31")
-                        .addListenerForSingleValueEvent(new ValueEventListener() {
-                            @Override
-                            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                                int presentCount = 0;
-                                int lateCount = 0;
-                                int halfDayCount = 0;
-                                int absentCount = 0;
-                                int onTimeCount = 0;
-                                long totalMinutes = 0;
-                                int daysWithHours = 0;
-
-                                // For charts - RESET ALL COUNTERS
-                                presentDays = 0;
-                                lateDays = 0;
-                                absentDays = 0;
-                                halfDays = 0;
-                                weeklyHours.clear();
-                                weekDays.clear();
-
-                                // Initialize weekly data
-                                initWeeklyData();
-
-                                // Track all dates in the month
-                                Set<String> allDatesInMonth = new HashSet<>();
-                                Calendar monthCal = Calendar.getInstance();
-                                monthCal.set(Calendar.DAY_OF_MONTH, 1);
-
-                                for (int i = 0; i < daysInMonth; i++) {
-                                    monthCal.set(Calendar.DAY_OF_MONTH, i + 1);
-                                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                                    String dateStr = sdf.format(monthCal.getTime());
-
-                                    // Skip future dates
-                                    if (dateStr.compareTo(today) > 0) {
-                                        continue;
-                                    }
-
-                                    // Skip dates before joining
-                                    if (joiningDate != null && dateStr.compareTo(joiningDate) < 0) {
-                                        continue;
-                                    }
-
-                                    // Skip weekly holidays
-                                    if (isHoliday(dateStr, weeklyHolidays)) {
-                                        continue;
-                                    }
-
-                                    allDatesInMonth.add(dateStr);
-                                }
-
-                                // Process attendance records
-                                for (DataSnapshot dateSnapshot : snapshot.getChildren()) {
-                                    String dateKey = dateSnapshot.getKey();
-
-                                    // Skip if date is before joining or is holiday
-                                    if (joiningDate != null && dateKey.compareTo(joiningDate) < 0) {
-                                        continue;
-                                    }
-                                    if (isHoliday(dateKey, weeklyHolidays)) {
-                                        continue;
-                                    }
-                                    if (dateKey.compareTo(today) > 0) {
-                                        continue;
-                                    }
-
-                                    DataSnapshot empData = dateSnapshot.child(employeeMobile);
-                                    if (empData.exists()) {
-                                        String finalStatus = empData.child("finalStatus").getValue(String.class);
-                                        String lateStatus = empData.child("lateStatus").getValue(String.class);
-                                        String checkInTime = empData.child("checkInTime").getValue(String.class);
-                                        String checkOutTime = empData.child("checkOutTime").getValue(String.class);
-                                        String status = empData.child("status").getValue(String.class);
-                                        String markedBy = empData.child("markedBy").getValue(String.class);
-                                        Long minutes = empData.child("totalMinutes").getValue(Long.class);
-
-                                        String effectiveStatus = (finalStatus != null) ? finalStatus : status;
-
-                                        if (effectiveStatus != null) {
-                                            Log.d("ATTENDANCE_DEBUG", "Date: " + dateKey +
-                                                    ", Status: " + effectiveStatus +
-                                                    ", LateStatus: " + lateStatus);
-
-                                            // Remove this date from allDatesInMonth (it has attendance)
-                                            allDatesInMonth.remove(dateKey);
-
-                                            String statusLower = effectiveStatus.toLowerCase();
-
-                                            // FIXED: Count for charts - handle both half day and late properly
-
-                                            // First, check if it's a half day
-                                            if (statusLower.contains("half")) {
-                                                halfDayCount++;
-                                                halfDays++;  // Count as half day in chart
-                                                presentCount++; // Counts toward attendance
-
-                                                // Even if it's half day, it can also be late
-                                                if (lateStatus != null && lateStatus.equals("Late") ||
-                                                        statusLower.contains("late")) {
-                                                    lateCount++;
-                                                    lateDays++; // Count as late in chart
-                                                } else {
-                                                    onTimeCount++;
-                                                }
-
-                                                presentDays++; // Half day counts as present for total
-
-                                                Log.d("HALF_DAY_DEBUG", "Half day counted - Late: " +
-                                                        (lateStatus != null && lateStatus.equals("Late")));
-                                            }
-                                            // Then check for PRESENT (not half day)
-                                            else if (statusLower.contains("present") ||
-                                                    (checkInTime != null && !checkInTime.isEmpty())) {
-                                                presentCount++;
-                                                presentDays++;
-
-                                                if (lateStatus != null && lateStatus.equals("Late") ||
-                                                        statusLower.contains("late")) {
-                                                    lateCount++;
-                                                    lateDays++;
-                                                } else {
-                                                    onTimeCount++;
-                                                }
-                                            }
-                                            // Check for ABSENT
-                                            else if (statusLower.contains("absent")) {
-                                                absentCount++;
-                                                absentDays++;
-                                            }
-
-                                            // Calculate worked minutes (same as before)
-                                            long dayMinutes = 0;
-
-                                            if (minutes != null && minutes > 0 && minutes < 1440) {
-                                                dayMinutes = minutes;
-                                            } else if (checkInTime != null && !checkInTime.isEmpty() &&
-                                                    checkOutTime != null && !checkOutTime.isEmpty()) {
-                                                long calculatedMinutes = getDiffMinutes(checkInTime, checkOutTime);
-                                                if (calculatedMinutes > 0 && calculatedMinutes < 1440) {
-                                                    dayMinutes = calculatedMinutes;
-                                                }
-                                            } else if ("Admin".equals(markedBy)) {
-                                                if (effectiveStatus.equals("Present")) {
-                                                    dayMinutes = shiftDurationMinutes;
-                                                } else if (effectiveStatus.equals("Half Day")) {
-                                                    dayMinutes = shiftDurationMinutes / 2;
-                                                }
-                                            }
-
-                                            if (dayMinutes > 0) {
-                                                totalMinutes += dayMinutes;
-                                                daysWithHours++;
-                                            }
-
-                                            // Collect weekly data for line chart
-                                            collectWeeklyData(dateKey, dayMinutes);
-                                        }
-                                    }
-                                }
-
-                                // All remaining dates in allDatesInMonth are ABSENT (no attendance record)
-                                for (String absentDate : allDatesInMonth) {
-                                    // Skip future dates
-                                    if (absentDate.compareTo(today) > 0) continue;
-
-                                    absentCount++;
-                                    absentDays++;
-                                    Log.d("ABSENT_CALC", "Marked as absent: " + absentDate);
-                                }
-
-                                Log.d("STATS_DEBUG", "====================================");
-                                Log.d("STATS_DEBUG", "Final Attendance Summary:");
-                                Log.d("STATS_DEBUG", "Present Days: " + presentCount);
-                                Log.d("STATS_DEBUG", "Late Days: " + lateCount);
-                                Log.d("STATS_DEBUG", "Half Days: " + halfDayCount);
-                                Log.d("STATS_DEBUG", "Absent Days: " + absentCount);
-                                Log.d("STATS_DEBUG", "Present Days (Chart): " + presentDays);
-                                Log.d("STATS_DEBUG", "Late Days (Chart): " + lateDays);
-                                Log.d("STATS_DEBUG", "Half Days (Chart): " + halfDays);
-                                Log.d("STATS_DEBUG", "Absent Days (Chart): " + absentDays);
-                                Log.d("STATS_DEBUG", "====================================");
-
-                                final int finalPresentCount = presentCount;
-                                final int finalLateCount = lateCount;
-                                final int finalHalfDayCount = halfDayCount;
-                                final int finalAbsentCount = absentCount;
-                                final int finalOnTimeCount = onTimeCount;
-                                final long finalTotalMinutes = totalMinutes;
-                                final int finalDaysWithHours = daysWithHours;
-                                final int finalDaysInMonth = daysInMonth;
-
-                                runOnUiThread(() -> {
-                                    // Update chart summary - these now correctly show:
-                                    // - Half Days: Count of days marked as half day
-                                    // - Late Days: Count of days marked as late (including late half days)
-                                    tvChartPresent.setText(String.valueOf(presentDays));
-                                    tvChartLate.setText(String.valueOf(lateDays));
-                                    tvChartAbsent.setText(String.valueOf(absentDays));
-                                    tvChartHalfDay.setText(String.valueOf(halfDays));
-
-                                    // Update existing text views
-                                    tvMonthPresent.setText(String.valueOf(finalPresentCount));
-                                    tvMonthLate.setText(String.valueOf(finalLateCount));
-
-                                    // Calculate working days in month (for progress bar max)
-                                    int workingDays = getWorkingDaysInMonth();
-                                    Log.d("WORKING_DAYS", "Working days in month: " + workingDays);
-
-                                    // Update progress bars
-                                    animateProgress(progressPresent, finalPresentCount, workingDays);
-
-                                    int lateMax = finalPresentCount > 0 ? finalPresentCount : 1;
-                                    animateProgress(progressLate, finalLateCount, lateMax);
-
-                                    // Average hours calculation
-                                    if (finalDaysWithHours > 0) {
-                                        double avgHours = (double) finalTotalMinutes / finalDaysWithHours / 60.0;
-
-                                        // Safety check - average should be between 0 and 24
-                                        if (avgHours >= 0 && avgHours <= 24) {
-                                            String avgText = String.format(Locale.getDefault(), "%.1f", avgHours);
-                                            tvAvgWorkHours.setText(avgText);
-
-                                            // Progress: 0-9 hours maps to 0-90
-                                            int progressValue = Math.min((int) (avgHours * 10), 90);
-                                            animateProgress(progressAvgHours, progressValue, 90);
-                                            Log.d("STATS_DEBUG", "Avg Hours: " + avgText);
-                                        } else {
-                                            tvAvgWorkHours.setText("0.0");
-                                            if (progressAvgHours != null) progressAvgHours.setProgress(0);
-                                        }
-                                    } else {
-                                        tvAvgWorkHours.setText("0.0");
-                                        if (progressAvgHours != null) progressAvgHours.setProgress(0);
-                                    }
-
-                                    // On-time percentage
-                                    if (finalPresentCount > 0) {
-                                        int onTimePercent = (int) ((finalOnTimeCount * 100.0) / finalPresentCount);
-                                        tvOnTimePercent.setText(String.valueOf(onTimePercent));
-                                        animateProgress(progressOnTime, onTimePercent, 100);
-                                    } else {
-                                        tvOnTimePercent.setText("0");
-                                        if (progressOnTime != null) progressOnTime.setProgress(0);
-                                    }
-
-                                    // Update all charts
-                                    updatePieChart();
-                                    updateBarChart();
-                                    updateLineChart();
-                                    updateDonutChart();
-                                    updateLegend();
-                                });
-                            }
-
-                            @Override
-                            public void onCancelled(@NonNull DatabaseError error) {
-                                Log.e("STATS_ERROR", "Firebase error: " + error.getMessage());
-                                runOnUiThread(() -> {
-                                    tvMonthPresent.setText("0");
-                                    tvMonthLate.setText("0");
-                                    tvAvgWorkHours.setText("0.0");
-                                    tvOnTimePercent.setText("0");
-                                    tvChartPresent.setText("0");
-                                    tvChartLate.setText("0");
-                                    tvChartAbsent.setText("0");
-                                    tvChartHalfDay.setText("0");
-                                    progressPresent.setProgress(0);
-                                    progressLate.setProgress(0);
-                                    progressAvgHours.setProgress(0);
-                                    progressOnTime.setProgress(0);
-                                });
-                            }
-                        });
+                // Also fetch company holidays
+                fetchCompanyHolidays(joiningDate, weeklyHolidays, today, daysInMonth, currentMonth);
             }
 
             @Override
@@ -1009,6 +736,335 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
             }
         });
     }
+
+    // New method to fetch company holidays
+    private void fetchCompanyHolidays(String joiningDate, int[] weeklyHolidays,
+                                      String today, int daysInMonth, String currentMonth) {
+        DatabaseReference companyHolidaysRef = FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("holidays");
+
+        companyHolidaysRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot holidaysSnapshot) {
+                Set<String> companyHolidayDates = new HashSet<>();
+
+                // Get current year-month for filtering
+                String currentYearMonth = currentMonth; // yyyy-MM format
+
+                for (DataSnapshot holidaySnap : holidaysSnapshot.getChildren()) {
+                    String holidayDate = holidaySnap.child("date").getValue(String.class);
+                    String holidayName = holidaySnap.child("name").getValue(String.class);
+
+                    // Only include holidays in current month
+                    if (holidayDate != null && holidayDate.startsWith(currentYearMonth)) {
+                        companyHolidayDates.add(holidayDate);
+                        Log.d("HOLIDAY_DEBUG", "Company holiday: " + holidayDate + " - " + holidayName);
+                    }
+                }
+
+                // Now load attendance data with all holiday info
+                loadAttendanceWithHolidays(joiningDate, weeklyHolidays, companyHolidayDates,
+                        today, daysInMonth, currentMonth);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e("HOLIDAY_ERROR", "Error fetching company holidays: " + error.getMessage());
+                // Continue without company holidays
+                loadAttendanceWithHolidays(joiningDate, weeklyHolidays, new HashSet<>(),
+                        today, daysInMonth, currentMonth);
+            }
+        });
+    }
+
+    // New method to load attendance with holiday filtering
+    private void loadAttendanceWithHolidays(String joiningDate, int[] weeklyHolidays,
+                                            Set<String> companyHolidayDates, String today,
+                                            int daysInMonth, String currentMonth) {
+        attendanceRef.orderByKey().startAt(currentMonth + "-01").endAt(currentMonth + "-31")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        int presentCount = 0;
+                        int lateCount = 0;
+                        int halfDayCount = 0;
+                        int absentCount = 0;
+                        int onTimeCount = 0;
+                        long totalMinutes = 0;
+                        int daysWithHours = 0;
+
+                        // For charts - RESET ALL COUNTERS
+                        presentDays = 0;
+                        lateDays = 0;
+                        absentDays = 0;
+                        halfDays = 0;
+                        weeklyHours.clear();
+                        weekDays.clear();
+
+                        // Initialize weekly data
+                        initWeeklyData();
+
+                        // Track all working dates in the month (excluding holidays)
+                        Set<String> workingDatesInMonth = new HashSet<>();
+                        Calendar monthCal = Calendar.getInstance();
+                        monthCal.set(Calendar.DAY_OF_MONTH, 1);
+
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+                        // First, identify all working days in the month
+                        for (int i = 0; i < daysInMonth; i++) {
+                            monthCal.set(Calendar.DAY_OF_MONTH, i + 1);
+                            String dateStr = sdf.format(monthCal.getTime());
+
+                            // Skip future dates
+                            if (dateStr.compareTo(today) > 0) {
+                                continue;
+                            }
+
+                            // Skip dates before joining
+                            if (joiningDate != null && dateStr.compareTo(joiningDate) < 0) {
+                                continue;
+                            }
+
+                            // Skip weekly holidays
+                            if (isHoliday(dateStr, weeklyHolidays)) {
+                                Log.d("HOLIDAY_DEBUG", "Skipping weekly holiday: " + dateStr);
+                                continue;
+                            }
+
+                            // Skip company holidays
+                            if (companyHolidayDates.contains(dateStr)) {
+                                Log.d("HOLIDAY_DEBUG", "Skipping company holiday: " + dateStr);
+                                continue;
+                            }
+
+                            // This is a working day
+                            workingDatesInMonth.add(dateStr);
+                        }
+
+                        Log.d("WORKING_DAYS_DEBUG", "Total working days in month: " + workingDatesInMonth.size());
+                        for (String workingDay : workingDatesInMonth) {
+                            Log.d("WORKING_DAYS_DEBUG", "Working day: " + workingDay);
+                        }
+
+                        // Process attendance records
+                        for (DataSnapshot dateSnapshot : snapshot.getChildren()) {
+                            String dateKey = dateSnapshot.getKey();
+
+                            // Skip if not a working day
+                            if (!workingDatesInMonth.contains(dateKey)) {
+                                continue;
+                            }
+
+                            DataSnapshot empData = dateSnapshot.child(employeeMobile);
+                            if (empData.exists()) {
+                                String finalStatus = empData.child("finalStatus").getValue(String.class);
+                                String lateStatus = empData.child("lateStatus").getValue(String.class);
+                                String checkInTime = empData.child("checkInTime").getValue(String.class);
+                                String checkOutTime = empData.child("checkOutTime").getValue(String.class);
+                                String status = empData.child("status").getValue(String.class);
+                                String markedBy = empData.child("markedBy").getValue(String.class);
+                                Long minutes = empData.child("totalMinutes").getValue(Long.class);
+
+                                String effectiveStatus = (finalStatus != null) ? finalStatus : status;
+
+                                if (effectiveStatus != null) {
+                                    Log.d("ATTENDANCE_DEBUG", "Date: " + dateKey +
+                                            ", Status: " + effectiveStatus +
+                                            ", LateStatus: " + lateStatus);
+
+                                    // Remove this date from workingDatesInMonth (it has attendance)
+                                    workingDatesInMonth.remove(dateKey);
+
+                                    String statusLower = effectiveStatus.toLowerCase();
+
+                                    // Count for charts - handle both half day and late properly
+                                    if (statusLower.contains("half")) {
+                                        halfDayCount++;
+                                        halfDays++;  // Count as half day in chart
+                                        presentCount++; // Counts toward attendance
+
+                                        if (lateStatus != null && lateStatus.equals("Late") ||
+                                                statusLower.contains("late")) {
+                                            lateCount++;
+                                            lateDays++; // Count as late in chart
+                                        } else {
+                                            onTimeCount++;
+                                        }
+
+                                        presentDays++; // Half day counts as present for total
+
+                                        Log.d("HALF_DAY_DEBUG", "Half day counted - Late: " +
+                                                (lateStatus != null && lateStatus.equals("Late")));
+                                    }
+                                    // Then check for PRESENT (not half day)
+                                    else if (statusLower.contains("present") ||
+                                            (checkInTime != null && !checkInTime.isEmpty())) {
+                                        presentCount++;
+                                        presentDays++;
+
+                                        if (lateStatus != null && lateStatus.equals("Late") ||
+                                                statusLower.contains("late")) {
+                                            lateCount++;
+                                            lateDays++;
+                                        } else {
+                                            onTimeCount++;
+                                        }
+                                    }
+                                    // Check for ABSENT
+                                    else if (statusLower.contains("absent")) {
+                                        absentCount++;
+                                        absentDays++;
+                                    }
+
+                                    // Calculate worked minutes
+                                    long dayMinutes = 0;
+
+                                    if (minutes != null && minutes > 0 && minutes < 1440) {
+                                        dayMinutes = minutes;
+                                    } else if (checkInTime != null && !checkInTime.isEmpty() &&
+                                            checkOutTime != null && !checkOutTime.isEmpty()) {
+                                        long calculatedMinutes = getDiffMinutes(checkInTime, checkOutTime);
+                                        if (calculatedMinutes > 0 && calculatedMinutes < 1440) {
+                                            dayMinutes = calculatedMinutes;
+                                        }
+                                    } else if ("Admin".equals(markedBy)) {
+                                        if (effectiveStatus.equals("Present")) {
+                                            dayMinutes = shiftDurationMinutes;
+                                        } else if (effectiveStatus.equals("Half Day")) {
+                                            dayMinutes = shiftDurationMinutes / 2;
+                                        }
+                                    }
+
+                                    if (dayMinutes > 0) {
+                                        totalMinutes += dayMinutes;
+                                        daysWithHours++;
+                                    }
+
+                                    // Collect weekly data for line chart
+                                    collectWeeklyData(dateKey, dayMinutes);
+                                }
+                            }
+                        }
+
+                        // All remaining dates in workingDatesInMonth are ABSENT (no attendance record)
+                        for (String absentDate : workingDatesInMonth) {
+                            absentCount++;
+                            absentDays++;
+                            Log.d("ABSENT_CALC", "Marked as absent: " + absentDate);
+                        }
+
+                        // Calculate total working days for charts (excludes all holidays)
+                        int totalWorkingDays = presentDays + absentDays;
+
+                        Log.d("STATS_DEBUG", "====================================");
+                        Log.d("STATS_DEBUG", "Final Attendance Summary:");
+                        Log.d("STATS_DEBUG", "Present Days: " + presentCount);
+                        Log.d("STATS_DEBUG", "Late Days: " + lateCount);
+                        Log.d("STATS_DEBUG", "Half Days: " + halfDayCount);
+                        Log.d("STATS_DEBUG", "Absent Days: " + absentCount);
+                        Log.d("STATS_DEBUG", "Present Days (Chart): " + presentDays);
+                        Log.d("STATS_DEBUG", "Late Days (Chart): " + lateDays);
+                        Log.d("STATS_DEBUG", "Half Days (Chart): " + halfDays);
+                        Log.d("STATS_DEBUG", "Absent Days (Chart): " + absentDays);
+                        Log.d("STATS_DEBUG", "Total Working Days: " + totalWorkingDays);
+                        Log.d("STATS_DEBUG", "====================================");
+
+                        final int finalPresentCount = presentCount;
+                        final int finalLateCount = lateCount;
+                        final int finalHalfDayCount = halfDayCount;
+                        final int finalAbsentCount = absentCount;
+                        final int finalOnTimeCount = onTimeCount;
+                        final long finalTotalMinutes = totalMinutes;
+                        final int finalDaysWithHours = daysWithHours;
+                        final int finalTotalWorkingDays = totalWorkingDays;
+
+                        runOnUiThread(() -> {
+                            // Update chart summary
+                            tvChartPresent.setText(String.valueOf(presentDays));
+                            tvChartLate.setText(String.valueOf(lateDays));
+                            tvChartAbsent.setText(String.valueOf(absentDays));
+                            tvChartHalfDay.setText(String.valueOf(halfDays));
+
+                            // Update existing text views
+                            tvMonthPresent.setText(String.valueOf(finalPresentCount));
+                            tvMonthLate.setText(String.valueOf(finalLateCount));
+
+                            // Update progress bars with correct working days
+                            if (finalTotalWorkingDays > 0) {
+                                animateProgress(progressPresent, presentDays, finalTotalWorkingDays);
+
+                                int lateMax = presentDays > 0 ? presentDays : 1;
+                                animateProgress(progressLate, lateDays, lateMax);
+                            } else {
+                                progressPresent.setProgress(0);
+                                progressLate.setProgress(0);
+                            }
+
+                            // Average hours calculation
+                            if (finalDaysWithHours > 0) {
+                                double avgHours = (double) finalTotalMinutes / finalDaysWithHours / 60.0;
+
+                                // Safety check - average should be between 0 and 24
+                                if (avgHours >= 0 && avgHours <= 24) {
+                                    String avgText = String.format(Locale.getDefault(), "%.1f", avgHours);
+                                    tvAvgWorkHours.setText(avgText);
+
+                                    // Progress: 0-9 hours maps to 0-90
+                                    int progressValue = Math.min((int) (avgHours * 10), 90);
+                                    animateProgress(progressAvgHours, progressValue, 90);
+                                    Log.d("STATS_DEBUG", "Avg Hours: " + avgText);
+                                } else {
+                                    tvAvgWorkHours.setText("0.0");
+                                    if (progressAvgHours != null) progressAvgHours.setProgress(0);
+                                }
+                            } else {
+                                tvAvgWorkHours.setText("0.0");
+                                if (progressAvgHours != null) progressAvgHours.setProgress(0);
+                            }
+
+                            // On-time percentage
+                            if (presentDays > 0) {
+                                int onTimePercent = (int) (( (presentDays - lateDays) * 100.0) / presentDays);
+                                tvOnTimePercent.setText(String.valueOf(onTimePercent));
+                                animateProgress(progressOnTime, onTimePercent, 100);
+                            } else {
+                                tvOnTimePercent.setText("0");
+                                if (progressOnTime != null) progressOnTime.setProgress(0);
+                            }
+
+                            // Update all charts
+                            updatePieChart();
+                            updateBarChart();
+                            updateLineChart();
+                            updateDonutChart();
+                            updateLegend();
+                        });
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Log.e("STATS_ERROR", "Firebase error: " + error.getMessage());
+                        runOnUiThread(() -> {
+                            tvMonthPresent.setText("0");
+                            tvMonthLate.setText("0");
+                            tvAvgWorkHours.setText("0.0");
+                            tvOnTimePercent.setText("0");
+                            tvChartPresent.setText("0");
+                            tvChartLate.setText("0");
+                            tvChartAbsent.setText("0");
+                            tvChartHalfDay.setText("0");
+                            progressPresent.setProgress(0);
+                            progressLate.setProgress(0);
+                            progressAvgHours.setProgress(0);
+                            progressOnTime.setProgress(0);
+                        });
+                    }
+                });
+    }
+
     private String getCheckInMessage() {
         if (!requiresGeoFencing) {
             return "📸 Taking photo for check-in (Field employee)...";
@@ -1194,7 +1250,9 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
     private void updatePieChart() {
         ArrayList<PieEntry> entries = new ArrayList<>();
 
-        int totalDays = presentDays + lateDays + halfDays + absentDays;
+        // Calculate total working days (present + absent only - excludes holidays)
+        int totalDays = presentDays + absentDays;
+
         if (totalDays == 0) {
             pieChart.clear();
             pieChart.setCenterText("No Data\nAvailable");
@@ -1203,10 +1261,10 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
             return;
         }
 
-        // Calculate percentages
+        // Calculate percentages based on total working days
         float presentPercent = (presentDays * 100f) / totalDays;
-        float latePercent = (lateDays * 100f) / totalDays;
-        float halfDayPercent = (halfDays * 100f) / totalDays;
+        float latePercent = (lateDays * 100f) / totalDays; // Late is subset of present
+        float halfDayPercent = (halfDays * 100f) / totalDays; // Half day is subset of present
         float absentPercent = (absentDays * 100f) / totalDays;
 
         // Only add entries with values > 0

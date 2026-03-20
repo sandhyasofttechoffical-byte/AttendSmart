@@ -45,4 +45,20 @@
         <item>Communication</item>
         <item>Other</item>
     </string-array>
+
+    <!-- Admin Claim Filters -->
+    <string-array name="admin_claim_status_filters">
+        <item>All Claims</item>
+        <item>Pending</item>
+        <item>Approved</item>
+        <item>Rejected</item>
+    </string-array>
+
+    <string-array name="admin_claim_status_values">
+        <item>all</item>
+        <item>pending</item>
+        <item>approved</item>
+        <item>rejected</item>
+    </string-array>
+
 </resources>

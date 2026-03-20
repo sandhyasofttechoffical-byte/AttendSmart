@@ -24,7 +24,8 @@
             app:navigationIcon="@drawable/ic_arrow_back"
             app:navigationIconTint="@android:color/white"
             app:title="My Leave Requests"
-            app:titleTextColor="@android:color/white" />
+            app:titleTextColor="@android:color/white"
+            app:menu="@menu/menu_my_leaves" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -38,6 +39,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@color/white"
             android:orientation="vertical">
 
             <!-- Filters & Sort Section -->
@@ -45,7 +47,7 @@
                 android:id="@+id/layoutFilters"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="12dp"
+                android:layout_margin="8dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="3dp"
                 app:strokeWidth="0dp"
@@ -56,7 +58,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:background="@color/white"
-                    android:padding="16dp">
+                    android:padding="13dp">
 
                     <!-- Status Filter Section -->
                     <LinearLayout
@@ -160,7 +162,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="#E0E0E0"
-                        android:layout_marginVertical="14dp" />
+                        android:layout_marginVertical="4dp" />
 
                     <!-- Sort Section -->
                     <TextView
@@ -239,7 +241,7 @@
                 android:orientation="horizontal"
                 android:paddingHorizontal="12dp"
                 android:paddingBottom="8dp"
-                android:visibility="gone">
+               >
 
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
@@ -254,7 +256,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="12dp"
+                        android:padding="8dp"
                         android:gravity="center">
 
                         <TextView
@@ -291,7 +293,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="12dp"
+                        android:padding="8dp"
                         android:gravity="center">
 
                         <TextView
@@ -327,7 +329,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="12dp"
+                        android:padding="8dp"
                         android:gravity="center">
 
                         <TextView
@@ -359,13 +361,14 @@
                 android:layout_height="wrap_content"
                 android:layout_margin="16dp"
                 android:visibility="gone"
-                app:cardCornerRadius="16dp"
                 app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
+                    android:background="@color/white"
+
                     android:gravity="center"
                     android:padding="48dp">
 

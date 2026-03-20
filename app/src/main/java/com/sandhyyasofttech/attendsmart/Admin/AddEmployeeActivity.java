@@ -714,66 +714,174 @@ public class AddEmployeeActivity extends AppCompatActivity {
                 .show();  // ✅ FIXED: Added .show()
     }
 
-    private void saveEmployee() {
-        btnSaveEmployee.setEnabled(false);
-        btnSaveEmployee.setText(isEditMode ? "Updating..." : "Saving...");
+//    private void saveEmployee() {
+//        btnSaveEmployee.setEnabled(false);
+//        btnSaveEmployee.setText(isEditMode ? "Updating..." : "Saving...");
+//
+//        String name = etEmpName.getText().toString().trim();
+//        String mobile = etEmpMobile.getText().toString().trim();
+//        String email = etEmpEmail.getText().toString().trim();
+//        String password = etEmpPassword.getText().toString().trim();
+//        String salary = etSalary.getText().toString().trim();
+//        String address = etAddress.getText().toString().trim();
+//        String emergencyContact = etEmergencyContact.getText().toString().trim();
+//        String employeeId = etEmployeeId.getText().toString().trim();
+//
+//        HashMap<String, Object> employeeInfo = new HashMap<>();
+//        employeeInfo.put("employeeName", name);
+//        employeeInfo.put("employeeMobile", mobile);
+//        employeeInfo.put("employeeEmail", email);
+//        employeeInfo.put("employeeDepartment", selectedDepartment);
+//        employeeInfo.put("employeeShift", selectedShiftKey);  // ✅ FIXED: selectedShiftKey
+//        employeeInfo.put("employeeRole", selectedRole);
+//        employeeInfo.put("weeklyHoliday", selectedHoliday);
+//        employeeInfo.put("joinDate", joiningDate);
+//        employeeInfo.put("employeeStatus", "ACTIVE");
+//        employeeInfo.put("employeeId", employeeId);
+//        employeeInfo.put("requiresGeoFencing", requiresGeoFencing);
+//
+//        // Password handling
+//        if (!isEditMode || !TextUtils.isEmpty(password)) {
+//            employeeInfo.put("employeePassword", password);
+//        }
+//
+//        // Optional fields
+//        if (!TextUtils.isEmpty(salary)) employeeInfo.put("salary", salary);
+//        if (!TextUtils.isEmpty(address)) employeeInfo.put("address", address);
+//        if (!TextUtils.isEmpty(emergencyContact)) employeeInfo.put("emergencyContact", emergencyContact);
+//
+//        if (!isEditMode) {
+//            employeeInfo.put("createdAt", System.currentTimeMillis());
+//        }
+//
+//        DatabaseReference targetRef = isEditMode ?
+//                employeesRef.child(editingEmployeeId).child("info") :
+//                employeesRef.child(mobile).child("info");
+//
+//        targetRef.setValue(employeeInfo)
+//                .addOnCompleteListener(task -> {
+//                    btnSaveEmployee.setEnabled(true);
+//                    btnSaveEmployee.setText(isEditMode ? "Update Employee" : "Save Employee");
+//
+//                    if (task.isSuccessful()) {
+//                        Toast.makeText(this, "✅ " + (isEditMode ? "Updated" : "Added") + " successfully!",
+//                                Toast.LENGTH_LONG).show();
+//                        finish();
+//                    } else {
+//                        Toast.makeText(this, "❌ Failed: " + task.getException().getMessage(),
+//                                Toast.LENGTH_LONG).show();
+//                    }
+//                });
+//    }
+private void saveEmployee() {
+    btnSaveEmployee.setEnabled(false);
+    btnSaveEmployee.setText(isEditMode ? "Updating..." : "Saving...");
 
-        String name = etEmpName.getText().toString().trim();
-        String mobile = etEmpMobile.getText().toString().trim();
-        String email = etEmpEmail.getText().toString().trim();
-        String password = etEmpPassword.getText().toString().trim();
-        String salary = etSalary.getText().toString().trim();
-        String address = etAddress.getText().toString().trim();
-        String emergencyContact = etEmergencyContact.getText().toString().trim();
-        String employeeId = etEmployeeId.getText().toString().trim();
+    String name = etEmpName.getText().toString().trim();
+    String mobile = etEmpMobile.getText().toString().trim();
+    String email = etEmpEmail.getText().toString().trim();
+    String password = etEmpPassword.getText().toString().trim();
+    String salary = etSalary.getText().toString().trim();
+    String address = etAddress.getText().toString().trim();
+    String emergencyContact = etEmergencyContact.getText().toString().trim();
+    String employeeId = etEmployeeId.getText().toString().trim();
 
-        HashMap<String, Object> employeeInfo = new HashMap<>();
-        employeeInfo.put("employeeName", name);
-        employeeInfo.put("employeeMobile", mobile);
-        employeeInfo.put("employeeEmail", email);
-        employeeInfo.put("employeeDepartment", selectedDepartment);
-        employeeInfo.put("employeeShift", selectedShiftKey);  // ✅ FIXED: selectedShiftKey
-        employeeInfo.put("employeeRole", selectedRole);
-        employeeInfo.put("weeklyHoliday", selectedHoliday);
-        employeeInfo.put("joinDate", joiningDate);
-        employeeInfo.put("employeeStatus", "ACTIVE");
-        employeeInfo.put("employeeId", employeeId);
-        employeeInfo.put("requiresGeoFencing", requiresGeoFencing);
+    HashMap<String, Object> employeeInfo = new HashMap<>();
+    employeeInfo.put("employeeName", name);
+    employeeInfo.put("employeeMobile", mobile);
+    employeeInfo.put("employeeEmail", email);
+    employeeInfo.put("employeeDepartment", selectedDepartment);
+    employeeInfo.put("employeeShift", selectedShiftKey);
+    employeeInfo.put("employeeRole", selectedRole);
+    employeeInfo.put("weeklyHoliday", selectedHoliday);
+    employeeInfo.put("joinDate", joiningDate);
+    employeeInfo.put("employeeStatus", "ACTIVE");
+    employeeInfo.put("employeeId", employeeId);
+    employeeInfo.put("requiresGeoFencing", requiresGeoFencing);
 
-        // Password handling
-        if (!isEditMode || !TextUtils.isEmpty(password)) {
+    // ✅ FIXED: Password handling for edit mode
+    if (isEditMode) {
+        // If password field is NOT empty, update it
+        if (!TextUtils.isEmpty(password)) {
             employeeInfo.put("employeePassword", password);
         }
-
-        // Optional fields
-        if (!TextUtils.isEmpty(salary)) employeeInfo.put("salary", salary);
-        if (!TextUtils.isEmpty(address)) employeeInfo.put("address", address);
-        if (!TextUtils.isEmpty(emergencyContact)) employeeInfo.put("emergencyContact", emergencyContact);
-
-        if (!isEditMode) {
-            employeeInfo.put("createdAt", System.currentTimeMillis());
+        // If password field IS empty, DO NOT include it in the update
+        // This preserves the existing password in Firebase
+    } else {
+        // For new employee, password is required
+        if (!TextUtils.isEmpty(password)) {
+            employeeInfo.put("employeePassword", password);
         }
-
-        DatabaseReference targetRef = isEditMode ?
-                employeesRef.child(editingEmployeeId).child("info") :
-                employeesRef.child(mobile).child("info");
-
-        targetRef.setValue(employeeInfo)
-                .addOnCompleteListener(task -> {
-                    btnSaveEmployee.setEnabled(true);
-                    btnSaveEmployee.setText(isEditMode ? "Update Employee" : "Save Employee");
-
-                    if (task.isSuccessful()) {
-                        Toast.makeText(this, "✅ " + (isEditMode ? "Updated" : "Added") + " successfully!",
-                                Toast.LENGTH_LONG).show();
-                        finish();
-                    } else {
-                        Toast.makeText(this, "❌ Failed: " + task.getException().getMessage(),
-                                Toast.LENGTH_LONG).show();
-                    }
-                });
     }
 
+    // Optional fields
+    if (!TextUtils.isEmpty(salary)) employeeInfo.put("salary", salary);
+    if (!TextUtils.isEmpty(address)) employeeInfo.put("address", address);
+    if (!TextUtils.isEmpty(emergencyContact)) employeeInfo.put("emergencyContact", emergencyContact);
+
+    if (!isEditMode) {
+        employeeInfo.put("createdAt", System.currentTimeMillis());
+    }
+
+    DatabaseReference targetRef = isEditMode ?
+            employeesRef.child(editingEmployeeId).child("info") :
+            employeesRef.child(mobile).child("info");
+
+    // For edit mode, we need to do a proper update that preserves existing fields
+    if (isEditMode) {
+        // First get the current data to merge properly
+        targetRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                // Get existing values
+                HashMap<String, Object> updates = new HashMap<>(employeeInfo);
+
+                // If password was NOT provided, ensure we keep the existing one
+                if (TextUtils.isEmpty(password) && snapshot.child("employeePassword").exists()) {
+                    String existingPassword = snapshot.child("employeePassword").getValue(String.class);
+                    updates.put("employeePassword", existingPassword);
+                }
+
+                // Update with merged data
+                targetRef.updateChildren(updates)
+                        .addOnCompleteListener(task -> {
+                            handleSaveResult(task);
+                        });
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                btnSaveEmployee.setEnabled(true);
+                btnSaveEmployee.setText("Update Employee");
+                Toast.makeText(AddEmployeeActivity.this,
+                        "❌ Failed to fetch current data: " + error.getMessage(),
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+    } else {
+        // For new employee, simple setValue
+        targetRef.setValue(employeeInfo)
+                .addOnCompleteListener(task -> {
+                    handleSaveResult(task);
+                });
+    }
+}
+
+    // Add this helper method to handle save results
+    private void handleSaveResult(@NonNull com.google.android.gms.tasks.Task<Void> task) {
+        btnSaveEmployee.setEnabled(true);
+        btnSaveEmployee.setText(isEditMode ? "Update Employee" : "Save Employee");
+
+        if (task.isSuccessful()) {
+            Toast.makeText(this, "✅ " + (isEditMode ? "Updated" : "Added") + " successfully!",
+                    Toast.LENGTH_LONG).show();
+            finish();
+        } else {
+            Toast.makeText(this, "❌ Failed: " +
+                            (task.getException() != null ? task.getException().getMessage() : "Unknown error"),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
     private void showSuccessDialog(String employeeName) {
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Success!")

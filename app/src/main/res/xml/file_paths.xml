@@ -1,6 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
+<paths>
+    <!-- For external files directory -->
+    <external-path
+        name="external_files"
+        path="." />
+
+    <!-- For Android/data/com.sandhyyasofttech.attendsmart/files -->
     <external-files-path
-        name="images"
-        path="Pictures" />
+        name="external_app_files"
+        path="." />
+
+    <!-- Specifically for Documents folder in app's external files -->
+    <external-files-path
+        name="documents"
+        path="Documents/" />
+
+    <!-- For app's internal files -->
+    <files-path
+        name="internal_files"
+        path="." />
+
+    <!-- For cache directory -->
+    <cache-path
+        name="cache"
+        path="." />
+
+    <!-- For external cache -->
+    <external-cache-path
+        name="external_cache"
+        path="." />
+
+    <!-- For Downloads folder (public) -->
+    <external-path
+        name="downloads"
+        path="Download/" />
 </paths>

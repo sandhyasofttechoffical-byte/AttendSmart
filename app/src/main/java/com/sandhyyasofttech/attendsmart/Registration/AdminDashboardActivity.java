@@ -1,196 +1,1443 @@
 package com.sandhyyasofttech.attendsmart.Registration;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.DisplayMetrics;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import android.animation.ValueAnimator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.RotateAnimation;
+import android.view.animation.Animation;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.github.mikephil.charting.charts.BarChart;
+import com.github.mikephil.charting.charts.PieChart;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.BarData;
+import com.github.mikephil.charting.data.BarDataSet;
+import com.github.mikephil.charting.data.BarEntry;
+import com.github.mikephil.charting.data.PieData;
+import com.github.mikephil.charting.data.PieDataSet;
+import com.github.mikephil.charting.data.PieEntry;
+import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.utils.ColorTemplate;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
+import com.google.android.material.imageview.ShapeableImageView;
+import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.sandhyyasofttech.attendsmart.Activities.AdminLeaveListActivity;
+import com.sandhyyasofttech.attendsmart.Activities.AdminTodayWorkActivity;
+import com.sandhyyasofttech.attendsmart.Activities.AllAttendanceActivity;
 import com.sandhyyasofttech.attendsmart.Activities.DepartmentActivity;
+import com.sandhyyasofttech.attendsmart.Activities.EmployeeListActivity;
+import com.sandhyyasofttech.attendsmart.Activities.GenerateSalaryActivity;
+import com.sandhyyasofttech.attendsmart.Activities.ProfileActivity;
+import com.sandhyyasofttech.attendsmart.Activities.ReportsActivity;
+import com.sandhyyasofttech.attendsmart.Activities.SalaryListActivity;
 import com.sandhyyasofttech.attendsmart.Activities.ShiftActivity;
 import com.sandhyyasofttech.attendsmart.Adapters.EmployeeAdapter;
 import com.sandhyyasofttech.attendsmart.Admin.AddEmployeeActivity;
 import com.sandhyyasofttech.attendsmart.Models.EmployeeModel;
+import com.sandhyyasofttech.attendsmart.Models.GeoFencingConfig;
 import com.sandhyyasofttech.attendsmart.R;
+import com.sandhyyasofttech.attendsmart.Settings.SettingsActivity;
 import com.sandhyyasofttech.attendsmart.Utils.PrefManager;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+import com.bumptech.glide.Glide;
 
 public class AdminDashboardActivity extends AppCompatActivity {
 
-    private TextView tvTotalEmployees, tvPresent, tvAbsent, tvLate, tvDepartmentCount;
-    private MaterialButton btnManageDepartments;
-
+    // UI Views
+    private MaterialToolbar topAppBar;
+    private TextView tvTotalEmployees, tvPresent, tvAbsent, tvLate;
+    private TextView tvAvgCheckIn, tvTotalHours, tvOnTimePercent;
+    private BarChart weeklyChart;
     private RecyclerView rvEmployees;
+    private TextInputEditText etSearch;
     private EmployeeAdapter adapter;
     private ArrayList<EmployeeModel> employeeList;
+    private ArrayList<EmployeeModel> fullEmployeeList;
+    private ExtendedFloatingActionButton fabAddEmployee;
+    private Menu navMenu;
+    private MenuItem navLeavesItem;
 
-    private FloatingActionButton fabAddEmployee;
+    // Donut Charts
+    private PieChart donutTotal, donutPresent, donutAbsent, donutLate;
 
-    private DatabaseReference employeesRef, departmentsRef;
+    // New UI Components
+    private ImageView btnMenu, btnSettings, btnNotifications;
+    private TextView tvNotificationBadge;
+    private TextView tvWelcomeGreeting, tvCompanyNameLarge, tvCurrentDate, tvCurrentTime;
+    private Chip chipAddEmployee, chipViewReports, chipQuickActions;
+    private TextView tvViewAllEmployees;
+
+    // Firebase
+    private DatabaseReference employeesRef, attendanceRef;
     private String companyKey;
-    private TextView tvShiftCount;
-    private MaterialButton btnManageShifts;
-    private DatabaseReference shiftsRef;
+    private TextView tvToolbarTitle;
+
+    private DrawerLayout drawerLayout;
+    private NavigationView navigationView;
+    private static final int NOTIF_PERMISSION = 201;
+    private boolean isChartAnimated = false;
+
+    private Handler trackingHandler;
+    private Runnable trackingRunnable;
+    private int snapshotCounter = 0;
+    private GeoFencingConfig geoFencingConfig;
+    private boolean geoFencingEnabled = false;
+    private boolean isCurrentlyCheckedIn = false;
+    private boolean locationReady = false;
+    private String employeeMobile = "";
+    private double currentLat = 0;
+    private double currentLng = 0;
+    private ValueAnimator totalAnimator, presentAnimator, absentAnimator, lateAnimator;
+
+    private Handler timeHandler;
+    private Runnable timeRunnable;
+
+    private FusedLocationProviderClient fusedLocationClient;
+    private LocationCallback locationCallback;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_admin_dashboard);
 
-        // Dashboard cards
+        initializeViews();
+
+        if (!setupCompanySession()) return;
+
+        // Set status bar color
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(getResources().getColor(R.color.blue_800));
+        }
+
+        initializeFirebaseReferences();
+
+        setupToolbar();
+        setupDrawer();
+        fetchCompanyNameForTitle();
+        setupDateTimeUpdater();
+        setupGreeting();
+
+        saveAdminFcmToken();
+        ensureNotificationSetting();
+        setupClickListeners();
+        setupSearchView();
+        requestNotificationPermission();
+        setupRealTimeLeaveListener();
+
+        setupDonutCharts();
+        fetchAllData();
+
+        setupWeeklyChart();
+        fetchWeeklyData();
+        fetchPendingNotifications();
+        checkLeaveRequestsForBadge();
+
+        // Add this line to animate charts on open
+        animateAllChartsOnOpen();
+    }
+    private String getTodayDate() {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+    }
+
+    private void startLocationTracking() {
+        Log.d("AdminDashboard", "Location tracking not needed for admin");
+    }
+
+    private void stopLocationTracking() {
+        if (trackingHandler != null && trackingRunnable != null) {
+            trackingHandler.removeCallbacks(trackingRunnable);
+            trackingHandler = null;
+            trackingRunnable = null;
+            snapshotCounter = 0;
+            Log.d("LocationTracking", "Stopped periodic tracking");
+        }
+    }
+
+    private void saveLocationSnapshot() {
+        Log.d("AdminDashboard", "Location snapshot not needed for admin");
+    }
+
+    private void stopWorkTimer() {
+        Log.d("AdminDashboard", "Work timer not needed for admin");
+    }
+
+    // New Methods for Enhanced UI
+
+    private void setupDateTimeUpdater() {
+        timeHandler = new Handler();
+        timeRunnable = new Runnable() {
+            @Override
+            public void run() {
+                updateDateTime();
+                timeHandler.postDelayed(this, 60000); // Update every minute
+            }
+        };
+        updateDateTime();
+        timeHandler.post(timeRunnable);
+    }
+
+    private void updateDateTime() {
+        // Update date
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMM dd, yyyy", Locale.getDefault());
+        tvCurrentDate.setText(dateFormat.format(new Date()));
+
+        // Update time
+        SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+        tvCurrentTime.setText(timeFormat.format(new Date()));
+    }
+
+    private void setupGreeting() {
+        Calendar calendar = Calendar.getInstance();
+        int hourOfDay = calendar.get(Calendar.HOUR_OF_DAY);
+
+        String greeting;
+        if (hourOfDay >= 0 && hourOfDay < 12) {
+            greeting = "Good Morning";
+        } else if (hourOfDay >= 12 && hourOfDay < 17) {
+            greeting = "Good Afternoon";
+        } else {
+            greeting = "Good Evening";
+        }
+
+        tvWelcomeGreeting.setText(greeting);
+    }
+
+    private void checkLeaveRequestsForBadge() {
+        FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("leaves")
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        int pendingCount = 0;
+                        for (DataSnapshot leave : snapshot.getChildren()) {
+                            String status = leave.child("status").getValue(String.class);
+                            if ("PENDING".equalsIgnoreCase(status)) {
+                                pendingCount++;
+                            }
+                        }
+
+                        if (pendingCount > 0) {
+                            tvNotificationBadge.setVisibility(View.VISIBLE);
+                            tvNotificationBadge.setText(String.valueOf(pendingCount));
+                        } else {
+                            tvNotificationBadge.setVisibility(View.GONE);
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {}
+                });
+    }
+
+    private void fetchPendingNotifications() {
+        FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("notifications")
+                .orderByChild("delivered")
+                .equalTo(false)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        if (!snapshot.exists()) return;
+
+                        List<NotificationData> notifications = new ArrayList<>();
+
+                        for (DataSnapshot notifSnap : snapshot.getChildren()) {
+                            String title = notifSnap.child("title").getValue(String.class);
+                            String body = notifSnap.child("body").getValue(String.class);
+
+                            if (title != null && body != null) {
+                                notifications.add(new NotificationData(title, body));
+                            }
+
+                            notifSnap.getRef().child("delivered").setValue(true);
+                        }
+
+                        if (!notifications.isEmpty()) {
+                            showNotificationDialog(notifications);
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {}
+                });
+    }
+
+    private void showNotificationDialog(List<NotificationData> notifications) {
+        View dialogView = getLayoutInflater()
+                .inflate(R.layout.dialog_pending_notifications, null);
+
+        LinearLayout container = dialogView.findViewById(R.id.notificationsContainer);
+
+        for (NotificationData notif : notifications) {
+            View itemView = getLayoutInflater()
+                    .inflate(R.layout.notification_item, container, false);
+
+            TextView tvTitle = itemView.findViewById(R.id.tvNotificationTitle);
+            TextView tvBody = itemView.findViewById(R.id.tvNotificationBody);
+
+            tvTitle.setText(notif.title);
+            tvBody.setText(notif.body);
+
+            container.addView(itemView);
+        }
+
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(dialogView)
+                .setCancelable(false)
+                .create();
+
+        TextView btnDismiss = dialogView.findViewById(R.id.btnDismiss);
+        btnDismiss.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
+    private static class NotificationData {
+        String title;
+        String body;
+
+        NotificationData(String title, String body) {
+            this.title = title;
+            this.body = body;
+        }
+    }
+
+    private void setupRealTimeLeaveListener() {
+        FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("leaves")
+                .addChildEventListener(new ChildEventListener() {
+                    @Override
+                    public void onChildAdded(@NonNull DataSnapshot snapshot, String previousChildName) {
+                        checkLeaveRequests();
+                    }
+                    @Override public void onChildChanged(@NonNull DataSnapshot snapshot, String previousChildName) { checkLeaveRequests(); }
+                    @Override public void onChildRemoved(@NonNull DataSnapshot snapshot) { checkLeaveRequests(); }
+                    @Override public void onChildMoved(@NonNull DataSnapshot snapshot, String previousChildName) {}
+                    @Override public void onCancelled(@NonNull DatabaseError error) {}
+                });
+    }
+
+    private void fetchCompanyNameForTitle() {
+        PrefManager prefManager = new PrefManager(this);
+        String email = prefManager.getUserEmail();
+        if (email == null) return;
+
+        String companyKey = email.replace(".", ",");
+
+        FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("companyInfo")
+                .child("companyName")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        String companyName = snapshot.getValue(String.class);
+                        if (companyName != null && !companyName.trim().isEmpty()) {
+                            tvToolbarTitle.setText(companyName);
+                            tvCompanyNameLarge.setText(companyName);
+                        } else {
+                            tvToolbarTitle.setText("Admin");
+                            tvCompanyNameLarge.setText("Your Company");
+                        }
+                    }
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {}
+                });
+    }
+
+    private void initializeViews() {
+        topAppBar = findViewById(R.id.topAppBar);
+
+        // New UI components
+        btnMenu = findViewById(R.id.btnMenu);
+        btnSettings = findViewById(R.id.btnSettings);
+        btnNotifications = findViewById(R.id.btnNotifications);
+        tvNotificationBadge = findViewById(R.id.tvNotificationBadge);
+        tvWelcomeGreeting = findViewById(R.id.tvWelcomeGreeting);
+        tvCompanyNameLarge = findViewById(R.id.tvCompanyNameLarge);
+        tvCurrentDate = findViewById(R.id.tvCurrentDate);
+        tvCurrentTime = findViewById(R.id.tvCurrentTime);
+        chipAddEmployee = findViewById(R.id.chipAddEmployee);
+        chipViewReports = findViewById(R.id.chipViewReports);
+        chipQuickActions = findViewById(R.id.chipQuickActions);
+        tvViewAllEmployees = findViewById(R.id.tvViewAllEmployees);
+
         tvTotalEmployees = findViewById(R.id.tvTotalEmployees);
         tvPresent = findViewById(R.id.tvPresent);
         tvAbsent = findViewById(R.id.tvAbsent);
         tvLate = findViewById(R.id.tvLate);
-        tvDepartmentCount = findViewById(R.id.tvDepartmentCount);
-        btnManageDepartments = findViewById(R.id.btnManageDepartments);
+        tvToolbarTitle = findViewById(R.id.tvToolbarTitle);
 
-        // FAB
-        fabAddEmployee = findViewById(R.id.fabAddEmployee);
+        tvAvgCheckIn = findViewById(R.id.tvAvgCheckIn);
+        tvTotalHours = findViewById(R.id.tvTotalHours);
+        tvOnTimePercent = findViewById(R.id.tvOnTimePercent);
+        weeklyChart = findViewById(R.id.weeklyChart);
 
-        // RecyclerView
+        // Initialize donut charts
+        donutTotal = findViewById(R.id.donutTotal);
+        donutPresent = findViewById(R.id.donutPresent);
+        donutAbsent = findViewById(R.id.donutAbsent);
+        donutLate = findViewById(R.id.donutLate);
+
+        etSearch = findViewById(R.id.etSearch);
+
         rvEmployees = findViewById(R.id.rvEmployees);
         rvEmployees.setLayoutManager(new LinearLayoutManager(this));
+        rvEmployees.setHasFixedSize(true);
 
         employeeList = new ArrayList<>();
-        adapter = new EmployeeAdapter(employeeList);
+        fullEmployeeList = new ArrayList<>();
+        adapter = new EmployeeAdapter(employeeList, this);
         rvEmployees.setAdapter(adapter);
-        tvShiftCount = findViewById(R.id.tvShiftCount);
-        btnManageShifts = findViewById(R.id.btnManageShifts);
-        // Get logged-in company
-        PrefManager prefManager = new PrefManager(this);
-        String email = prefManager.getUserEmail();
-        if (email == null) {
-            Toast.makeText(this, "Session expired. Please login again.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-        companyKey = email.replace(".", ",");
 
-        // Firebase references
-        DatabaseReference companyRef = FirebaseDatabase.getInstance()
-                .getReference("Companies")
-                .child(companyKey);
-        employeesRef = companyRef.child("employees");
-        departmentsRef = companyRef.child("departments");
-        shiftsRef = companyRef.child("shifts");
-        fetchShiftCount();
-        btnManageShifts.setOnClickListener(v ->
-                startActivity(new Intent(this, ShiftActivity.class)));
-        // Fetch data
-        fetchEmployeeList();
-        fetchDashboardData();
-        fetchDepartmentCount();
-
-        // FAB click → Add Employee
-        fabAddEmployee.setOnClickListener(v ->
-                startActivity(new Intent(this, AddEmployeeActivity.class)));
-
-        // ✅ Department button click
-        btnManageDepartments.setOnClickListener(v ->
-                startActivity(new Intent(this, DepartmentActivity.class)));
+        fabAddEmployee = findViewById(R.id.fabAddEmployee);
     }
-    private void fetchShiftCount() {
-        shiftsRef.addValueEventListener(new ValueEventListener() {
+
+    private void setupDonutCharts() {
+        setupDonutChart(donutTotal);
+        setupDonutChart(donutPresent);
+        setupDonutChart(donutAbsent);
+        setupDonutChart(donutLate);
+    }
+    // Updated setupDonutChart method with compact percentage
+    private void setupDonutChart(PieChart donutChart) {
+        donutChart.setUsePercentValues(false);
+        donutChart.getDescription().setEnabled(false);
+        donutChart.setDrawHoleEnabled(true);
+        donutChart.setHoleColor(Color.TRANSPARENT);
+        donutChart.setTransparentCircleColor(Color.WHITE);
+        donutChart.setTransparentCircleAlpha(110);
+        donutChart.setHoleRadius(70f); // Increased from 65f to make hole bigger
+        donutChart.setTransparentCircleRadius(75f);
+        donutChart.setDrawCenterText(true);
+        donutChart.setDrawEntryLabels(false);
+        donutChart.setTouchEnabled(false);
+        donutChart.setDragDecelerationFrictionCoef(0.95f);
+
+        // Compact center text styling
+        donutChart.setCenterTextSize(11f); // Reduced from 14f to 11f
+        donutChart.setCenterTextTypeface(Typeface.DEFAULT_BOLD);
+        donutChart.setCenterTextColor(Color.BLACK);
+
+        // Legend
+        donutChart.getLegend().setEnabled(false);
+
+        // Entry label styling
+        donutChart.setEntryLabelColor(Color.WHITE);
+        donutChart.setEntryLabelTextSize(0f);
+    }
+
+    // Updated animatePercentageText method with compact formatting
+    private void animatePercentageText(PieChart donutChart, int targetPercent) {
+        ValueAnimator percentAnimator = ValueAnimator.ofInt(0, targetPercent);
+        percentAnimator.setDuration(800); // Slightly faster animation
+        percentAnimator.setInterpolator(new DecelerateInterpolator());
+
+        percentAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                long count = snapshot.getChildrenCount();
-                tvShiftCount.setText(count + " shifts");
+            public void onAnimationUpdate(ValueAnimator animation) {
+                int currentPercent = (int) animation.getAnimatedValue();
+                // Compact format - just the number with % symbol
+                donutChart.setCenterText(currentPercent + "%");
+                donutChart.invalidate();
             }
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
         });
+
+        percentAnimator.start();
     }
-    // ================= EMPLOYEE LIST =================
-    private void fetchEmployeeList() {
-        employeesRef.addValueEventListener(new ValueEventListener() {
+
+    // Updated updateDonutChart method with adjusted parameters for compact donut
+    private void updateDonutChart(PieChart donutChart, int value, int total, int color) {
+        if (donutChart == null) return;
+
+        // Cancel any existing animation for this chart
+        if (donutChart == donutTotal && totalAnimator != null) totalAnimator.cancel();
+        if (donutChart == donutPresent && presentAnimator != null) presentAnimator.cancel();
+        if (donutChart == donutAbsent && absentAnimator != null) absentAnimator.cancel();
+        if (donutChart == donutLate && lateAnimator != null) lateAnimator.cancel();
+
+        float percentage = (total > 0) ? (value * 100f) / total : 0f;
+        int percentInt = Math.round(percentage);
+
+        // Animate the percentage text counting
+        animatePercentageText(donutChart, percentInt);
+
+        // Animate the chart rotation
+        animateChartRotation(donutChart);
+
+        // Create entries with animation
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, percentage);
+        animator.setDuration(800); // Slightly faster animation
+        animator.setInterpolator(new DecelerateInterpolator());
+
+        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float animatedPercentage = (float) animation.getAnimatedValue();
+                float remaining = 100f - animatedPercentage;
+                if (remaining < 0) remaining = 0;
+
+                ArrayList<PieEntry> entries = new ArrayList<>();
+                entries.add(new PieEntry(animatedPercentage, ""));
+                if (remaining > 0.1f) {
+                    entries.add(new PieEntry(remaining, ""));
+                }
+
+                PieDataSet dataSet = new PieDataSet(entries, "");
+
+                ArrayList<Integer> colors = new ArrayList<>();
+                colors.add(color);
+                if (remaining > 0.1f) {
+                    colors.add(Color.parseColor("#E0E0E0"));
+                }
+
+                dataSet.setColors(colors);
+                dataSet.setSliceSpace(0f);
+                dataSet.setSelectionShift(0f);
+                dataSet.setDrawValues(false); // Don't draw values on slices
+
+                PieData data = new PieData(dataSet);
+                donutChart.setData(data);
+                donutChart.invalidate();
+            }
+        });
+
+        // Store animator reference
+        if (donutChart == donutTotal) {
+            totalAnimator = animator;
+        } else if (donutChart == donutPresent) {
+            presentAnimator = animator;
+        } else if (donutChart == donutAbsent) {
+            absentAnimator = animator;
+        } else if (donutChart == donutLate) {
+            lateAnimator = animator;
+        }
+
+        animator.start();
+    }
+
+    // Simplified rotation animation (shorter duration)
+    private void animateChartRotation(PieChart donutChart) {
+        RotateAnimation rotate = new RotateAnimation(
+                0f, 360f,
+                Animation.RELATIVE_TO_SELF, 0.5f,
+                Animation.RELATIVE_TO_SELF, 0.5f
+        );
+        rotate.setDuration(600); // Reduced from 800ms to 600ms
+        rotate.setInterpolator(new DecelerateInterpolator());
+        rotate.setFillAfter(true);
+
+        donutChart.startAnimation(rotate);
+    }
+
+    private void setupWeeklyChart() {
+        weeklyChart.setHighlightPerTapEnabled(false);
+        weeklyChart.setHighlightPerDragEnabled(false);
+        weeklyChart.getDescription().setEnabled(false);
+        weeklyChart.setTouchEnabled(true);
+        weeklyChart.setDragEnabled(true);
+        weeklyChart.setScaleEnabled(false);
+        weeklyChart.setPinchZoom(false);
+        weeklyChart.setDrawGridBackground(false);
+        weeklyChart.setExtraOffsets(5, 10, 5, 10);
+
+        XAxis xAxis = weeklyChart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setGranularity(1f);
+        xAxis.setDrawGridLines(false);
+        xAxis.setTextColor(Color.parseColor("#757575"));
+        xAxis.setValueFormatter(new ValueFormatter() {
+            private final String[] days = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+            @Override
+            public String getFormattedValue(float value) {
+                int index = (int) value;
+                return (index >= 0 && index < days.length) ? days[index] : "";
+            }
+        });
+
+        YAxis leftAxis = weeklyChart.getAxisLeft();
+        leftAxis.setDrawGridLines(true);
+        leftAxis.setGridColor(Color.parseColor("#E0E0E0"));
+        leftAxis.setTextColor(Color.parseColor("#757575"));
+        leftAxis.setAxisMinimum(0f);
+
+        weeklyChart.getAxisRight().setEnabled(false);
+        weeklyChart.getLegend().setEnabled(true);
+        weeklyChart.getLegend().setTextColor(Color.parseColor("#424242"));
+        weeklyChart.setFitBars(true);
+    }
+
+    private void fetchWeeklyData() {
+        Calendar cal = Calendar.getInstance();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+        cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+
+        List<String> dates = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            dates.add(sdf.format(cal.getTime()));
+            cal.add(Calendar.DAY_OF_YEAR, 1);
+        }
+
+        DatabaseReference attRef = FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("attendance");
+
+        List<BarEntry> presentEntries = new ArrayList<>();
+        List<BarEntry> absentEntries = new ArrayList<>();
+
+        final int[] processedDays = {0};
+
+        for (int i = 0; i < dates.size(); i++) {
+            final int dayIndex = i;
+            String date = dates.get(i);
+
+            employeesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot empSnapshot) {
+                    int totalEmp = (int) empSnapshot.getChildrenCount();
+
+                    attRef.child(date).addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot attSnapshot) {
+                            int present = 0;
+
+                            for (DataSnapshot att : attSnapshot.getChildren()) {
+                                if (att.hasChild("checkInTime")) {
+                                    present++;
+                                }
+                            }
+
+                            int absent = Math.max(0, totalEmp - present);
+
+                            presentEntries.add(new BarEntry(dayIndex, present));
+                            absentEntries.add(new BarEntry(dayIndex, absent));
+
+                            processedDays[0]++;
+                            if (processedDays[0] == 7) {
+                                updateWeeklyChart(presentEntries, absentEntries);
+                            }
+                        }
+
+                        @Override public void onCancelled(@NonNull DatabaseError error) {}
+                    });
+                }
+
+                @Override public void onCancelled(@NonNull DatabaseError error) {}
+            });
+        }
+    }
+
+    private void updateWeeklyChart(List<BarEntry> presentEntries, List<BarEntry> absentEntries) {
+        BarDataSet presentDataSet = new BarDataSet(presentEntries, "Present");
+        presentDataSet.setColor(Color.parseColor("#4CAF50"));
+        presentDataSet.setValueTextSize(10f);
+
+        BarDataSet absentDataSet = new BarDataSet(absentEntries, "Absent");
+        absentDataSet.setColor(Color.parseColor("#F44336"));
+        absentDataSet.setValueTextSize(10f);
+
+        BarData barData = new BarData(presentDataSet, absentDataSet);
+        barData.setBarWidth(0.38f);
+
+        weeklyChart.setData(barData);
+        weeklyChart.groupBars(0f, 0.12f, 0.04f);
+        weeklyChart.animateXY(700, 1200);
+        weeklyChart.invalidate();
+
+        if (!isChartAnimated) {
+            weeklyChart.animateY(1200);
+            isChartAnimated = true;
+        }
+    }
+
+    private void calculateQuickStats() {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+
+        attendanceRef.child(today).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                employeeList.clear();
-
                 if (!snapshot.exists()) {
-                    adapter.notifyDataSetChanged();
+                    tvAvgCheckIn.setText("--:--");
+                    tvTotalHours.setText("0h");
+                    tvOnTimePercent.setText("0%");
                     return;
                 }
 
-                for (DataSnapshot empSnap : snapshot.getChildren()) {
-                    DataSnapshot infoSnap = empSnap.child("info");
-                    if (infoSnap.exists()) {
-                        EmployeeModel model = infoSnap.getValue(EmployeeModel.class);
-                        if (model != null) {
-                            employeeList.add(model);
+                int totalCheckIns = 0;
+                int totalMinutes = 0;
+                float totalHours = 0f;
+                int onTimeCount = 0;
+
+                for (DataSnapshot att : snapshot.getChildren()) {
+                    String checkInTime = att.child("checkInTime").getValue(String.class);
+                    String totalHoursStr = att.child("totalHours").getValue(String.class);
+                    String lateStatus = att.child("lateStatus").getValue(String.class);
+
+                    if (checkInTime != null && !checkInTime.isEmpty()) {
+                        totalCheckIns++;
+
+                        try {
+                            SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+                            Date date = sdf.parse(checkInTime);
+
+                            if (date != null) {
+                                Calendar calendar = Calendar.getInstance();
+                                calendar.setTime(date);
+
+                                int hours = calendar.get(Calendar.HOUR_OF_DAY);
+                                int minutes = calendar.get(Calendar.MINUTE);
+
+                                totalMinutes += (hours * 60 + minutes);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+
+                        if (totalHoursStr != null && totalHoursStr.contains("h")) {
+                            try {
+                                totalHoursStr = totalHoursStr.replace("h", "").trim();
+                                totalHours += Float.parseFloat(totalHoursStr);
+                            } catch (Exception ignored) {}
+                        }
+
+                        if ("On Time".equalsIgnoreCase(lateStatus) || lateStatus == null || lateStatus.isEmpty()) {
+                            onTimeCount++;
                         }
                     }
                 }
-                adapter.notifyDataSetChanged();
-            }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(AdminDashboardActivity.this,
-                        "Failed to load employees",
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
+                if (totalCheckIns > 0) {
+                    int avgMinutes = totalMinutes / totalCheckIns;
+                    int avgHours = avgMinutes / 60;
+                    int avgMins = avgMinutes % 60;
+                    tvAvgCheckIn.setText(String.format(Locale.getDefault(), "%02d:%02d", avgHours, avgMins));
+                    tvTotalHours.setText(String.format(Locale.getDefault(), "%.1fh", totalHours));
 
-    // ================= DASHBOARD COUNTS =================
-    private void fetchDashboardData() {
-        employeesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (!snapshot.exists()) {
-                    tvTotalEmployees.setText("0");
-                    tvPresent.setText("0");
-                    tvAbsent.setText("0");
-                    tvLate.setText("0");
-                    return;
+                    int onTimePercent = (onTimeCount * 100) / totalCheckIns;
+                    tvOnTimePercent.setText(onTimePercent + "%");
+                } else {
+                    tvAvgCheckIn.setText("--:--");
+                    tvTotalHours.setText("0h");
+                    tvOnTimePercent.setText("0%");
                 }
-
-                int totalEmployees = (int) snapshot.getChildrenCount();
-                // Temporary logic (attendance not implemented yet)
-                int present = totalEmployees;
-                int absent = 0;
-                int late = 0;
-
-                tvTotalEmployees.setText(String.valueOf(totalEmployees));
-                tvPresent.setText(String.valueOf(present));
-                tvAbsent.setText(String.valueOf(absent));
-                tvLate.setText(String.valueOf(late));
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(AdminDashboardActivity.this,
-                        "Failed to load dashboard data",
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    // ================= DEPARTMENTS COUNT =================
-    private void fetchDepartmentCount() {
-        departmentsRef.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                long count = snapshot.getChildrenCount();
-                tvDepartmentCount.setText(count + " departments");
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {}
         });
+    }
+
+    private void setupSearchView() {
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                filterEmployees(s.toString().toLowerCase().trim());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+    }
+
+    private void filterEmployees(String query) {
+        employeeList.clear();
+        if (query.isEmpty()) {
+            employeeList.addAll(fullEmployeeList);
+        } else {
+            for (EmployeeModel employee : fullEmployeeList) {
+                if (employee.getEmployeeName().toLowerCase().contains(query) ||
+                        employee.getEmployeeMobile().contains(query) ||
+                        (employee.getEmployeeDepartment() != null &&
+                                employee.getEmployeeDepartment().toLowerCase().contains(query))) {
+                    employeeList.add(employee);
+                }
+            }
+        }
+        adapter.notifyDataSetChanged();
+    }
+
+    private void setupDrawer() {
+        drawerLayout = findViewById(R.id.drawer_layout);
+        navigationView = findViewById(R.id.nav_view);
+        navMenu = navigationView.getMenu();
+
+        // Setup menu button click listener
+        btnMenu.setOnClickListener(v -> {
+            if (drawerLayout.isDrawerVisible(GravityCompat.START)) {
+                drawerLayout.closeDrawer(GravityCompat.START);
+            } else {
+                drawerLayout.openDrawer(GravityCompat.START);
+            }
+        });
+
+        navigationView.setNavigationItemSelectedListener(item -> {
+            int id = item.getItemId();
+            Intent intent = null;
+
+            if (id == R.id.nav_dashboard) {
+                drawerLayout.closeDrawer(GravityCompat.START);
+                return true;
+            }
+            else if (id == R.id.nav_employees) intent = new Intent(this, EmployeeListActivity.class);
+            else if (id == R.id.nav_departments) intent = new Intent(this, DepartmentActivity.class);
+            else if (id == R.id.nav_shifts) intent = new Intent(this, ShiftActivity.class);
+            else if (id == R.id.nav_attendance) intent = new Intent(this, AllAttendanceActivity.class);
+            else if (id == R.id.nav_leaves) intent = new Intent(this, AdminLeaveListActivity.class);
+            else if (id == R.id.nav_reports) intent = new Intent(this, ReportsActivity.class);
+            else if (id == R.id.nav_work_report) intent = new Intent(this, AdminTodayWorkActivity.class);
+            else if (id == R.id.nav_view_salary) intent = new Intent(this, SalaryListActivity.class);
+            else if (id == R.id.nav_generate_salary) intent = new Intent(this, GenerateSalaryActivity.class);
+            else if (id == R.id.nav_profile) intent = new Intent(this, ProfileActivity.class);
+            else if (id == R.id.nav_settings) intent = new Intent(this, SettingsActivity.class);
+            else if (id == R.id.nav_logout) {
+                showLogoutConfirmation();
+                drawerLayout.closeDrawer(GravityCompat.START);
+                return true;
+            }
+
+            if (intent != null) startActivity(intent);
+            drawerLayout.closeDrawer(GravityCompat.START);
+            return true;
+        });
+
+        drawerLayout.addDrawerListener(new DrawerLayout.DrawerListener() {
+            @Override
+            public void onDrawerOpened(View drawerView) {
+                checkLeaveRequests();
+            }
+            @Override public void onDrawerClosed(View drawerView) {}
+            @Override public void onDrawerSlide(View drawerView, float slideOffset) {}
+            @Override public void onDrawerStateChanged(int newState) {}
+        });
+
+        navigationView.setCheckedItem(R.id.nav_dashboard);
+        updateNavHeader();
+    }
+
+    private boolean getDefaultGeoFencingRequirement(String role) {
+        if (role == null) return true;
+
+        String roleLower = role.toLowerCase();
+
+        if (roleLower.contains("field") ||
+                roleLower.contains("sales") ||
+                roleLower.contains("delivery") ||
+                roleLower.contains("driver") ||
+                roleLower.contains("site") ||
+                roleLower.contains("technician") ||
+                roleLower.contains("marketing") ||
+                roleLower.contains("service") ||
+                roleLower.contains("install")) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void migrateExistingEmployees() {
+        employeesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                int updated = 0;
+                for (DataSnapshot empSnap : snapshot.getChildren()) {
+                    DataSnapshot info = empSnap.child("info");
+                    if (!info.child("requiresGeoFencing").exists()) {
+                        String role = info.child("employeeRole").getValue(String.class);
+                        boolean defaultValue = getDefaultGeoFencingRequirement(role);
+
+                        info.getRef().child("requiresGeoFencing").setValue(defaultValue);
+                        updated++;
+                    }
+                }
+                Log.d("MIGRATION", "Updated " + updated + " employees");
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+    private void checkLeaveRequests() {
+        FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("leaves")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        int pendingCount = 0;
+                        for (DataSnapshot leave : snapshot.getChildren()) {
+                            String status = leave.child("status").getValue(String.class);
+                            if ("PENDING".equalsIgnoreCase(status)) {
+                                pendingCount++;
+                            }
+                        }
+
+                        navLeavesItem = navMenu.findItem(R.id.nav_leaves);
+                        if (pendingCount > 0) {
+                            navLeavesItem.setTitle("Leave Requests (" + pendingCount + ")");
+                        } else {
+                            navLeavesItem.setTitle(getString(R.string.leave_requests));
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {}
+                });
+    }
+
+    private void updateNavHeader() {
+        try {
+            View headerView = navigationView.getHeaderView(0);
+
+            TextView tvCompanyName = headerView.findViewById(R.id.tvCompanyName);
+            TextView tvUserEmail = headerView.findViewById(R.id.tvUserEmail);
+            ShapeableImageView ivProfile = headerView.findViewById(R.id.ivProfile);
+
+            PrefManager prefManager = new PrefManager(this);
+            tvUserEmail.setText(prefManager.getUserEmail());
+
+            String email = prefManager.getUserEmail();
+            if (email == null) return;
+
+            String companyKey = email.replace(".", ",");
+
+            DatabaseReference companyInfoRef = FirebaseDatabase.getInstance()
+                    .getReference("Companies")
+                    .child(companyKey)
+                    .child("companyInfo");
+
+            companyInfoRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (!snapshot.exists()) return;
+
+                    String companyName = snapshot.child("companyName").getValue(String.class);
+                    if (companyName != null && !companyName.isEmpty()) {
+                        tvCompanyName.setText(companyName);
+                    }
+
+                    String logoUrl = snapshot.child("companyLogo").getValue(String.class);
+                    if (logoUrl != null && !logoUrl.isEmpty()) {
+                        Glide.with(AdminDashboardActivity.this)
+                                .load(logoUrl)
+                                .placeholder(R.drawable.ic_person)
+                                .into(ivProfile);
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {}
+            });
+
+            headerView.setOnClickListener(v -> {
+                drawerLayout.closeDrawer(GravityCompat.START);
+                startActivity(new Intent(AdminDashboardActivity.this, ProfileActivity.class));
+            });
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void setupToolbar() {
+        topAppBar.setNavigationIcon(R.drawable.ic_menu);
+        topAppBar.setNavigationOnClickListener(v -> {
+            if (drawerLayout.isDrawerVisible(GravityCompat.START)) {
+                drawerLayout.closeDrawer(GravityCompat.START);
+            } else {
+                drawerLayout.openDrawer(GravityCompat.START);
+            }
+        });
+    }
+
+    private boolean setupCompanySession() {
+        PrefManager prefManager = new PrefManager(this);
+        String email = prefManager.getUserEmail();
+        if (email == null || email.isEmpty()) {
+            Toast.makeText(this, "Session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            navigateToLogin();
+            return false;
+        }
+        companyKey = email.replace(".", ",");
+        return true;
+    }
+
+    private void initializeFirebaseReferences() {
+        DatabaseReference companyRef = FirebaseDatabase.getInstance()
+                .getReference("Companies").child(companyKey);
+        employeesRef = companyRef.child("employees");
+        attendanceRef = companyRef.child("attendance");
+    }
+
+    private void setupClickListeners() {
+        // FAB Click Listener
+        fabAddEmployee.setOnClickListener(v ->
+                startActivity(new Intent(this, AddEmployeeActivity.class)));
+
+        // ===== NEW: Header Button Listeners =====
+
+        // Settings Button - Opens Settings Activity
+        btnSettings.setOnClickListener(v -> {
+            Intent intent = new Intent(AdminDashboardActivity.this, SettingsActivity.class);
+            startActivity(intent);
+        });
+
+        // Notifications Button - Opens Admin Today Work Activity (Daily Report)
+        btnNotifications.setOnClickListener(v -> {
+            Intent intent = new Intent(AdminDashboardActivity.this, AdminTodayWorkActivity.class);
+            startActivity(intent);
+        });
+
+        // Menu Button - Opens/Closes Navigation Drawer
+        btnMenu.setOnClickListener(v -> {
+            if (drawerLayout.isDrawerVisible(GravityCompat.START)) {
+                drawerLayout.closeDrawer(GravityCompat.START);
+            } else {
+                drawerLayout.openDrawer(GravityCompat.START);
+            }
+        });
+
+        // ===== Chip Click Listeners =====
+
+        chipAddEmployee.setOnClickListener(v ->
+                startActivity(new Intent(this, AddEmployeeActivity.class)));
+
+        chipViewReports.setOnClickListener(v ->
+                startActivity(new Intent(this, ReportsActivity.class)));
+
+        chipQuickActions.setOnClickListener(v ->
+                showQuickActionsDialog());
+
+        // ===== View All Employees =====
+
+        tvViewAllEmployees.setOnClickListener(v ->
+                startActivity(new Intent(this, EmployeeListActivity.class)));
+
+        // ===== Stats Cards Click Listeners =====
+
+        MaterialCardView totalEmployeesCard = findViewById(R.id.cardTotalEmployees);
+        if (totalEmployeesCard != null) {
+            totalEmployeesCard.setOnClickListener(v -> {
+                Intent intent = new Intent(AdminDashboardActivity.this, EmployeeListActivity.class);
+                startActivity(intent);
+            });
+        }
+
+        MaterialCardView presentCard = findViewById(R.id.cardPresent);
+        if (presentCard != null) {
+            presentCard.setOnClickListener(v -> {
+                Intent intent = new Intent(AdminDashboardActivity.this, AllAttendanceActivity.class);
+                startActivity(intent);
+            });
+        }
+
+        MaterialCardView absentCard = findViewById(R.id.cardAbsent);
+        if (absentCard != null) {
+            absentCard.setOnClickListener(v -> {
+                Intent intent = new Intent(AdminDashboardActivity.this, AllAttendanceActivity.class);
+                startActivity(intent);
+            });
+        }
+
+        MaterialCardView lateCard = findViewById(R.id.cardLate);
+        if (lateCard != null) {
+            lateCard.setOnClickListener(v -> {
+                Intent intent = new Intent(AdminDashboardActivity.this, AllAttendanceActivity.class);
+                startActivity(intent);
+            });
+        }
+    }
+
+    private void showQuickActionsDialog() {
+        String[] actions = {
+                "Add Employee",
+                "View Departments",
+                "Manage Shifts",
+                "View Attendance",
+                "Leave Requests",
+                "Generate Salary",
+                "Settings"
+        };
+
+        androidx.appcompat.app.AlertDialog.Builder builder =
+                new androidx.appcompat.app.AlertDialog.Builder(this);
+        builder.setTitle("Quick Actions")
+                .setItems(actions, (dialog, which) -> {
+                    Intent intent = null;
+                    switch (which) {
+                        case 0:
+                            intent = new Intent(this, AddEmployeeActivity.class);
+                            break;
+                        case 1:
+                            intent = new Intent(this, DepartmentActivity.class);
+                            break;
+                        case 2:
+                            intent = new Intent(this, ShiftActivity.class);
+                            break;
+                        case 3:
+                            intent = new Intent(this, AllAttendanceActivity.class);
+                            break;
+                        case 4:
+                            intent = new Intent(this, AdminLeaveListActivity.class);
+                            break;
+                        case 5:
+                            intent = new Intent(this, GenerateSalaryActivity.class);
+                            break;
+                        case 6:
+                            intent = new Intent(this, SettingsActivity.class);
+                            break;
+                    }
+                    if (intent != null) startActivity(intent);
+                });
+        builder.create().show();
+    }
+
+    private void saveAdminFcmToken() {
+        FirebaseMessaging.getInstance().getToken()
+                .addOnSuccessListener(token -> {
+                    if (token != null && !token.isEmpty()) {
+                        FirebaseDatabase.getInstance()
+                                .getReference("Companies")
+                                .child(companyKey)
+                                .child("companyInfo")
+                                .child("adminFcmToken")
+                                .setValue(token);
+                    }
+                });
+    }
+
+    private void ensureNotificationSetting() {
+        FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("companyInfo")
+                .child("notifyAttendance")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        if (!snapshot.exists()) {
+                            snapshot.getRef().setValue(true);
+                        }
+                    }
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {}
+                });
+    }
+
+    private void requestNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, NOTIF_PERMISSION);
+            }
+        }
+    }
+
+    private void fetchAllData() {
+        fetchEmployeeList();
+        fetchDashboardData();
+
+        if (attendanceRef != null) {
+            calculateQuickStats();
+        }
+    }
+
+    private void fetchEmployeeList() {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        FirebaseDatabase.getInstance().getReference("Companies").child(companyKey)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        fullEmployeeList.clear();
+                        ArrayList<EmployeeModel> presentList = new ArrayList<>();
+                        ArrayList<EmployeeModel> absentList = new ArrayList<>();
+
+                        DataSnapshot employeesSnap = snapshot.child("employees");
+                        DataSnapshot todayAttSnap = snapshot.child("attendance").child(today);
+
+                        if (employeesSnap.exists()) {
+                            for (DataSnapshot empSnap : employeesSnap.getChildren()) {
+                                DataSnapshot infoSnap = empSnap.child("info");
+                                if (infoSnap.exists()) {
+                                    EmployeeModel model = parseEmployeeSafely(infoSnap);
+                                    if (model != null) {
+                                        String phone = model.getEmployeeMobile();
+                                        DataSnapshot attRecord = todayAttSnap.child(phone);
+
+                                        // Check finalStatus first
+                                        String finalStatus = safeToString(attRecord.child("finalStatus"));
+
+                                        // If finalStatus is "Absent", mark as absent regardless of check-in
+                                        if ("Absent".equalsIgnoreCase(finalStatus)) {
+                                            model.setTodayStatus("Absent");
+                                            model.setCheckInTime(null);
+                                            model.setCheckOutTime(null);
+                                            model.setCheckInPhoto(null);
+                                            model.setCheckOutPhoto(null);
+                                            absentList.add(model);
+                                            fullEmployeeList.add(model);
+                                            continue; // Skip to next employee
+                                        }
+
+                                        // Existing Logic for other cases
+                                        if (attRecord.exists() && attRecord.hasChild("checkInTime")) {
+                                            String status = safeToString(attRecord.child("status"));
+                                            String lateStatus = safeToString(attRecord.child("lateStatus"));
+
+                                            if ("Half Day".equalsIgnoreCase(status)) {
+                                                model.setTodayStatus("Half Day");
+                                            } else if ("Late".equalsIgnoreCase(lateStatus)) {
+                                                model.setTodayStatus("Late");
+                                            } else if ("Present".equalsIgnoreCase(status) ||
+                                                    "Full Day".equalsIgnoreCase(status)) {
+                                                model.setTodayStatus("Present");
+                                            } else {
+                                                model.setTodayStatus("Present");
+                                            }
+
+                                            model.setCheckInTime(safeToString(attRecord.child("checkInTime")));
+                                            model.setCheckOutTime(safeToString(attRecord.child("checkOutTime")));
+                                            model.setTotalHours(safeToString(attRecord.child("totalHours")));
+                                            model.setCheckInPhoto(safeToString(attRecord.child("checkInPhoto")));
+                                            model.setCheckOutPhoto(safeToString(attRecord.child("checkOutPhoto")));
+
+                                            presentList.add(model);
+                                        } else {
+                                            // No check-in record and no finalStatus = Absent
+                                            model.setTodayStatus("Absent");
+                                            model.setCheckInTime(null);
+                                            model.setCheckOutTime(null);
+                                            model.setCheckInPhoto(null);
+                                            model.setCheckOutPhoto(null);
+                                            absentList.add(model);
+                                        }
+                                        fullEmployeeList.add(model);
+                                    }
+                                }
+                            }
+                        }
+
+                        employeeList.clear();
+                        employeeList.addAll(presentList);
+                        employeeList.addAll(absentList);
+                        adapter.notifyDataSetChanged();
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Toast.makeText(AdminDashboardActivity.this,
+                                "Failed to load employees", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private EmployeeModel parseEmployeeSafely(DataSnapshot infoSnap) {
+        try {
+            EmployeeModel model = new EmployeeModel();
+            model.setEmployeeId(safeToString(infoSnap.child("employeeId")));
+            model.setEmployeeName(safeToString(infoSnap.child("employeeName")));
+            model.setEmployeeMobile(safeToString(infoSnap.child("employeeMobile")));
+            model.setEmployeeRole(safeToString(infoSnap.child("employeeRole")));
+            model.setEmployeeEmail(safeToString(infoSnap.child("employeeEmail")));
+            model.setEmployeeDepartment(safeToString(infoSnap.child("employeeDepartment")));
+            model.setEmployeeStatus(safeToString(infoSnap.child("employeeStatus")));
+            model.setEmployeeShift(safeToString(infoSnap.child("employeeShift")));
+            model.setCreatedAt(safeToString(infoSnap.child("createdAt")));
+            model.setWeeklyHoliday(safeToString(infoSnap.child("weeklyHoliday")));
+            model.setJoinDate(safeToString(infoSnap.child("joinDate")));
+            return (model.getEmployeeName() != null && !model.getEmployeeName().trim().isEmpty()) ? model : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String safeToString(DataSnapshot dataSnap) {
+        if (!dataSnap.exists()) return null;
+        Object value = dataSnap.getValue();
+        if (value == null) return null;
+        return value.toString();
+    }
+
+    private void fetchDashboardData() {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+
+        employeesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot empSnapshot) {
+                int totalEmployees = (int) empSnapshot.getChildrenCount();
+
+                attendanceRef.child(today).addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot attSnapshot) {
+                        int presentCount = 0;
+                        int lateCount = 0;
+                        int markedAbsentCount = 0;
+
+                        for (DataSnapshot att : attSnapshot.getChildren()) {
+                            String finalStatus = att.child("finalStatus").getValue(String.class);
+
+                            if ("Absent".equalsIgnoreCase(finalStatus)) {
+                                markedAbsentCount++;
+                                continue;
+                            }
+
+                            if (att.hasChild("checkInTime")) {
+                                presentCount++;
+                                String lateStatus = att.child("lateStatus").getValue(String.class);
+                                if ("Late".equalsIgnoreCase(lateStatus)) {
+                                    lateCount++;
+                                }
+                            }
+                        }
+
+                        int notCheckedIn = Math.max(0, totalEmployees - presentCount - markedAbsentCount);
+                        int totalAbsent = notCheckedIn + markedAbsentCount;
+
+                        // Update UI
+                        updateDashboardUI(totalEmployees, presentCount, totalAbsent, lateCount);
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {}
+                });
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+
+    // Updated updateDashboardUI method
+    private void updateDashboardUI(int total, int present, int absent, int late) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                // Update text values
+                tvTotalEmployees.setText(String.valueOf(total));
+                tvPresent.setText(String.valueOf(present));
+                tvAbsent.setText(String.valueOf(absent));
+                tvLate.setText(String.valueOf(late));
+
+                // Update donut charts with animation
+                updateDonutChart(donutTotal, total, total, Color.parseColor("#3F51B5"));
+                updateDonutChart(donutPresent, present, total, Color.parseColor("#4CAF50"));
+                updateDonutChart(donutAbsent, absent, total, Color.parseColor("#F44336"));
+                updateDonutChart(donutLate, late, total, Color.parseColor("#FF9800"));
+            }
+        });
+    }
+
+    // Add this method to handle rotation on first load only
+    private void animateAllChartsOnOpen() {
+        // Add a small delay to ensure views are measured
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                animateChartRotation(donutTotal);
+                animateChartRotation(donutPresent);
+                animateChartRotation(donutAbsent);
+                animateChartRotation(donutLate);
+            }
+        }, 300);
+    }
+    private void showLogoutConfirmation() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Logout")
+                .setMessage("Are you sure you want to logout?")
+                .setPositiveButton("Yes", (dialog, which) -> performLogout())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void performLogout() {
+        new PrefManager(this).logout();
+        Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
+        navigateToLogin();
+    }
+
+    private void navigateToLogin() {
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        fetchAllData();
+        fetchWeeklyData();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (timeHandler != null && timeRunnable != null) {
+            timeHandler.removeCallbacks(timeRunnable);
+        }
+        stopWorkTimer();
+        stopLocationTracking();
+        if (fusedLocationClient != null && locationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(locationCallback);
+        }
     }
 }

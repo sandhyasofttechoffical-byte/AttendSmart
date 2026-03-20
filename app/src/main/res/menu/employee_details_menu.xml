@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_edit_employee"
+        android:icon="@drawable/ic_edit"
+        android:title="Edit"
+        app:showAsAction="ifRoom"
+        app:iconTint="@android:color/white" />
+
+    <item
+        android:id="@+id/nav_salery"
+        android:title=" Salery Setting" />
+
+    <item
+        android:id="@+id/action_deactivate_employee"
+        android:icon="@drawable/salary"
+        android:title="Toggle Status"
+        app:showAsAction="ifRoom"
+        />
+
+</menu>

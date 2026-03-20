@@ -1,35 +1,267 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
 
-    <color name="primary">#1976D2</color> <!-- Professional Blue -->
+    <!--    <color name="primary">#1976D2</color> &lt;!&ndash; Professional Blue &ndash;&gt;-->
     <color name="primary_variant">#1565C0</color>
-    <color name="primary_light">#42A5F5</color>
+    <!--    <color name="primary_light">#42A5F5</color>-->
 
-    <!-- Secondary Colors -->
-    <color name="secondary">#388E3C</color> <!-- Success Green -->
-    <color name="secondary_variant">#2E7D32</color>
+    <color name="colorPrimary">#FF5722</color>
+    <color name="colorPrimary1">#219ebc</color>
+    <color name="colorPrimaryDark">#E64A19</color>
+    <color name="colorAccent">#FF9800</color>
+
+    <!-- Status Colors -->
+    <color name="colorOnTime">#4CAF50</color>
+    <color name="colorLate">#FF9800</color>
+    <color name="colorAbsent">#F44336</color>
+    <color name="purple_500">#9C27B0</color>
+    <!-- Background Colors -->
+    <color name="backgroundColor">#F5F5F5</color>
+    <color name="cardBackground">#FFFFFF</color>
+    <color name="lateCardBackground">#FFF8E1</color>
+
+    <!-- Text Colors -->
+    <color name="textPrimary">#212121</color>
+    <color name="textSecondary">#757575</color>
+    <color name="textTertiary">#9E9E9E</color>
+
+    <color name="background_gray">#F5F7FA</color>
+    <color name="background_light">#F8F9FA</color>
+
+    <color name="present">#4CAF50</color>
+    <color name="present_bg">#E8F5E9</color>
+
+    <color name="late">#FF9800</color>
+    <color name="late_bg">#FFF3E0</color>
+
+    <color name="halfday">#2196F3</color>
+    <color name="halfday_bg">#E3F2FD</color>
+
+    <color name="absent">#F44336</color>
+    <color name="absent_bg">#FFEBEE</color>
+
+    <!-- Card Styling -->
+    <color name="card_stroke">#E0E0E0</color>
+
+    <!-- Primary Color -->
+
+    <color name="dividerColor">#E0E0E0</color>
+
+    <!-- Working Hours Background -->
+    <color name="workingHoursBackground">#E8F5E9</color>
+    <color name="workingHoursText">#2E7D32</color>
+
 
     <!-- Backgrounds -->
     <color name="light_gray">#F5F5F5</color>
     <color name="gray">#E0E0E0</color>
     <color name="dark_gray">#757575</color>
+    <color name="green_light">#C8E6C9</color>
+    <color name="red_light">#FFCDD2</color>
+    <color name="orange_light">#FFE0B2</color>
 
-    <!-- Text Colors -->
-    <color name="text_primary">#000000</color>
-    <color name="text_secondary">#757575</color>
-
-    <!-- Status Colors -->
-    <color name="success">#4CAF50</color>
-    <color name="warning">#FF9800</color>
-    <color name="error">#F44336</color>
-
-    <!-- App Theme Colors (Material 3) -->
-    <color name="surface">#FFFFFF</color>
     <color name="on_surface">#000000</color>
 
-    **<color name="green">#4CAF50</color>
+    <color name="secondary">#388E3C</color>
+    <color name="secondary_variant">#2E7D32</color>
+
+    <!-- Status Colors -->
+    <color name="green">#4CAF50</color>
     <color name="orange">#FF9800</color>
-    <color name="red">#F44336</color>**
+    <color name="red">#F44336</color>
+
+    <!-- Grays -->
+    <color name="gray_200">#F5F5F5</color>
+    <color name="gray_400">#BDBDBD</color>
+    <color name="gray_600">#616161</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Navigation -->
+    <color name="nav_item_color">#1976D2</color>
+
+    <color name="yellow">#FF9800</color>
+    <color name="chip_filter_bg_checked">#FF5722</color>
+    <color name="chip_filter_bg_unchecked">#F5F5F5</color>
+    <color name="chip_filter_bg" />
+
+    <color name="stat_present_bg">#E8F5E9</color>
+    <color name="stat_present_primary">#2E7D32</color>
+    <color name="stat_present_progress">#4CAF50</color>
+
+    <color name="stat_late_bg">#FFF3E0</color>
+    <color name="stat_late_primary">#E65100</color>
+    <color name="stat_late_progress">#FF9800</color>
+
+    <color name="stat_hours_bg">#E3F2FD</color>
+    <color name="stat_hours_primary">#1565C0</color>
+    <color name="stat_hours_progress">#2196F3</color>
+
+    <color name="stat_percent_bg">#F3E5F5</color>
+    <color name="stat_percent_primary">#6A1B9A</color>
+    <color name="stat_percent_progress">#9C27B0</color>
+
+    <color name="progress_track">#E0E0E0</color>
+
+    <!-- Primary Colors -->
+    <color name="primary">#5B7FFF</color>
+    <color name="primary_dark">#4A5FCC</color>
+    <color name="primary_light">#F0F4FF</color>
+    <color name="accent">#764BA2</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#1E293B</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_tertiary">#94A3B8</color>
+
+    <!-- Status Colors -->
+    <color name="success">#10B981</color>
+    <color name="success_light">#E8F7ED</color>
+    <color name="error">#EF4444</color>
+    <color name="error_light">#FEF2F2</color>
+    <color name="warning">#F59E0B</color>
+    <color name="warning_light">#FEF7EC</color>
+    <color name="info">#5B7FFF</color>
+    <color name="info_light">#F0F4FF</color>
+
+    <!-- Background Colors -->
+    <color name="background">#F8F9FE</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="surface">#FFFFFF</color>
+
+    <!-- Border & Divider -->
+    <color name="border">#E2E8F0</color>
+    <color name="divider">#F1F5F9</color>
+
+
+    <!-- Background colors -->
+    <color name="background_color">#F5F5F5</color>
+    <color name="light_green">#E8F5E9</color>
+    <color name="light_orange">#FFF3E0</color>
+    <color name="light_blue">#E3F2FD</color>
+    <color name="light_red">#FFEBEE</color>
+    <color name="blue_800">#2196F3</color>
+    <color name="text_grey">#95A5A6</color>
+    <color name="border_grey">#B0BEC5</color>
+    <color name="dark_grey">#7F8C8D</color>
+    <color name="light_gray_bg">#F5F5F5</color>
+    <color name="blue_500">#2196F3</color>
+    <color name="red_500">#F44336</color>
+
+    <color name="gray_700">#616161</color>
+
+    <color name="gray_500">#9E9E9E</color>
+    <color name="gray_300">#E0E0E0</color>
+    <color name="transparent">#00000000</color>
+
+
+
+    <!-- Primary Blue Colors -->
+    <color name="blue_50">#E3F2FD</color>
+    <color name="blue_100">#BBDEFB</color>
+    <color name="blue_200">#90CAF9</color>
+    <color name="blue_300">#64B5F6</color>
+    <color name="blue_400">#42A5F5</color>
+    <color name="blue_600">#1E88E5</color>
+    <color name="blue_700">#1976D2</color>
+    <color name="blue_900">#0D47A1</color>
+
+    <!-- Green Colors -->
+    <color name="green_50">#E8F5E9</color>
+    <color name="green_100">#C8E6C9</color>
+    <color name="green_200">#A5D6A7</color>
+    <color name="green_300">#81C784</color>
+    <color name="green_400">#66BB6A</color>
+    <color name="green_500">#4CAF50</color>
+    <color name="green_600">#43A047</color>
+    <color name="green_700">#388E3C</color>
+    <color name="green_800">#2E7D32</color>
+    <color name="green_900">#1B5E20</color>
+
+    <!-- Red Colors -->
+    <color name="red_50">#FFEBEE</color>
+    <color name="red_100">#FFCDD2</color>
+    <color name="red_200">#EF9A9A</color>
+    <color name="red_300">#E57373</color>
+    <color name="red_400">#EF5350</color>
+    <color name="red_600">#E53935</color>
+    <color name="red_700">#D32F2F</color>
+    <color name="red_800">#C62828</color>
+    <color name="red_900">#B71C1C</color>
+
+    <!-- Orange Colors -->
+    <color name="orange_50">#FFF3E0</color>
+    <color name="orange_100">#FFE0B2</color>
+    <color name="orange_200">#FFCC80</color>
+    <color name="orange_300">#FFB74D</color>
+    <color name="orange_400">#FFA726</color>
+    <color name="orange_500">#FF9800</color>
+    <color name="orange_600">#FB8C00</color>
+    <color name="orange_700">#F57C00</color>
+    <color name="orange_800">#EF6C00</color>
+    <color name="orange_900">#E65100</color>
+
+    <!-- Purple Colors -->
+    <color name="purple_50">#F3E5F5</color>
+    <color name="purple_100">#E1BEE7</color>
+    <color name="purple_200">#CE93D8</color>
+    <color name="purple_300">#BA68C8</color>
+    <color name="purple_400">#AB47BC</color>
+    <color name="purple_600">#8E24AA</color>
+    <color name="purple_700">#7B1FA2</color>
+    <color name="purple_800">#6A1B9A</color>
+    <color name="purple_900">#4A148C</color>
+
+    <!-- Grey Colors -->
+    <color name="grey_50">#FAFAFA</color>
+    <color name="grey_100">#F5F5F5</color>
+    <color name="grey_200">#EEEEEE</color>
+    <color name="grey_300">#E0E0E0</color>
+    <color name="grey_400">#BDBDBD</color>
+    <color name="grey_500">#9E9E9E</color>
+    <color name="grey_600">#757575</color>
+    <color name="grey_700">#616161</color>
+    <color name="grey_800">#424242</color>
+    <color name="grey_900">#212121</color>
+
+    <!-- White with Opacity -->
+    <color name="white_90">#E6FFFFFF</color>
+    <color name="white_80">#CCFFFFFF</color>
+    <color name="white_70">#B3FFFFFF</color>
+    <color name="white_60">#99FFFFFF</color>
+    <color name="white_50">#80FFFFFF</color>
+    <color name="white_40">#66FFFFFF</color>
+    <color name="white_30">#4DFFFFFF</color>
+    <color name="white_20">#33FFFFFF</color>
+    <color name="white_10">#1AFFFFFF</color>
+
+    <!-- Black with Opacity -->
+    <color name="black_90">#E6000000</color>
+    <color name="black_80">#CC000000</color>
+    <color name="black_70">#B3000000</color>
+    <color name="black_60">#99000000</color>
+    <color name="black_50">#80000000</color>
+    <color name="black_40">#66000000</color>
+    <color name="black_30">#4D000000</color>
+    <color name="black_20">#33000000</color>
+    <color name="black_10">#1A000000</color>
+
+    <!-- Gradient Background Colors -->
+    <color name="gradient_purple_light">#F3E5F5</color>
+    <color name="gradient_green_light">#E8F5E9</color>
+    <color name="gradient_red_light">#FFEBEE</color>
+    <color name="gradient_orange_light">#FFF3E0</color>
+    <color name="gradient_blue_light">#E3F2FD</color>
+
+    <!-- Chip Colors -->
+    <color name="chip_transparent_bg">#33FFFFFF</color>
+
+    <color name="status_pending">#FFC107</color>
+    <color name="status_approved">#4CAF50</color>
+    <color name="status_rejected">#F44336</color>
+    <color name="status_pending_text">#FF6F00</color>
+    <color name="status_approved_text">#2E7D32</color>
+    <color name="status_rejected_text">#C62828</color>
+
+
 </resources>

@@ -4,15 +4,17 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -28,7 +30,7 @@ import java.util.ArrayList;
 
 public class LoginActivity extends AppCompatActivity {
 
-    private EditText etEmail, etPassword;
+    private TextInputEditText etEmail, etPassword;
     private Button btnLogin;
     private TextView tvRegister, tvForgotPassword;
     private ProgressBar progressBar;
@@ -37,6 +39,18 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Set status bar color
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(getResources().getColor(R.color.blue_800));
+        }
+
+
+        // Make status bar transparent with gradient color
+        getWindow().setFlags(
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        );
+
         setContentView(R.layout.activity_login);
 
         rootRef = FirebaseDatabase.getInstance().getReference();
@@ -100,8 +114,11 @@ public class LoginActivity extends AppCompatActivity {
                                 prefManager.saveCompanyKey(companyKey);
 
                                 showLoading(false);
-                                startActivity(new Intent(LoginActivity.this, AdminDashboardActivity.class));
+                                Intent intent = new Intent(LoginActivity.this, AdminDashboardActivity.class);
+                                startActivity(intent);
+                                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
                                 finish();
+
                                 return;
                             }
 
@@ -116,61 +133,79 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void checkEmployeeLogin(String employeeEmail, String password) {
-        rootRef.child("Companies").addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                ArrayList<String> companies = new ArrayList<>();
+        rootRef.child("Companies")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
 
-                for (DataSnapshot companySnapshot : snapshot.getChildren()) {
-                    String companyKey = companySnapshot.getKey();
-                    for (DataSnapshot employeeSnapshot : companySnapshot.child("employees").getChildren()) {
-                        DataSnapshot info = employeeSnapshot.child("info");
-                        if (info.exists()) {
-                            Object emailObj = info.child("employeeEmail").getValue(Object.class);
-                            Object passwordObj = info.child("employeePassword").getValue(Object.class);
-                            Object statusObj = info.child("employeeStatus").getValue(Object.class);
+                        ArrayList<String> companies = new ArrayList<>();
+                        String employeeMobile = null;
 
-                            String email = emailObj != null ? emailObj.toString() : null;
-                            String storedPassword = passwordObj != null ? passwordObj.toString() : null;
-                            String status = statusObj != null ? statusObj.toString() : null;
+                        for (DataSnapshot companySnapshot : snapshot.getChildren()) {
+                            String companyKey = companySnapshot.getKey();
 
-                            if (email != null && storedPassword != null && status != null &&
-                                    employeeEmail.equals(email) &&
-                                    password.equals(storedPassword) &&
-                                    "ACTIVE".equals(status)) {
-                                companies.add(companyKey);
-                            String employeeMobile = employeeSnapshot.getKey();  // ✅ Get mobile key
-                                PrefManager prefManager = new PrefManager(LoginActivity.this);
-                                prefManager.setEmployeeEmail(employeeEmail);  // ✅ Employee email
-                                prefManager.setEmployeeMobile(employeeMobile);  // ✅ Mobile for attendance
-                                prefManager.saveUserEmail(employeeEmail);  // ✅ Admin compatibility
-                                prefManager.saveUserType("EMPLOYEE");
-                                prefManager.saveCompanyKey(companyKey);
+                            for (DataSnapshot employeeSnapshot :
+                                    companySnapshot.child("employees").getChildren()) {
 
-                                showLoading(false);
-                                Intent intent = new Intent(LoginActivity.this, EmployeeDashboardActivity.class);
-                                intent.putExtra("companyKey", companyKey);
-                                startActivity(intent);
-                                finish();
-                                return;  // ✅ Exit immediately
+                                DataSnapshot info = employeeSnapshot.child("info");
+
+                                if (!info.exists()) continue;
+
+                                String email = info.child("employeeEmail").getValue(String.class);
+                                String storedPassword = info.child("employeePassword").getValue(String.class);
+                                String status = info.child("employeeStatus").getValue(String.class);
+
+                                if (employeeEmail.equals(email)
+                                        && password.equals(storedPassword)
+                                        && "ACTIVE".equals(status)) {
+
+                                    companies.add(companyKey);
+
+                                    // Save mobile once
+                                    if (employeeMobile == null) {
+                                        employeeMobile = employeeSnapshot.getKey();
+                                    }
+                                }
                             }
                         }
+
+                        showLoading(false);
+
+                        if (companies.size() == 0) {
+                            Toast.makeText(LoginActivity.this,
+                                    "Invalid credentials ❌", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        PrefManager pref = new PrefManager(LoginActivity.this);
+                        pref.setEmployeeEmail(employeeEmail);
+                        pref.setEmployeeMobile(employeeMobile);
+                        pref.saveUserType("EMPLOYEE");
+
+                        if (companies.size() == 1) {
+                            // ✅ Single company → direct login
+                            pref.saveCompanyKey(companies.get(0));
+                            startActivity(new Intent(LoginActivity.this,
+                                    EmployeeDashboardActivity.class));
+                            finish();
+                        } else {
+                            // ✅ Multiple companies → selector
+                            Intent intent = new Intent(LoginActivity.this,
+                                    EmployeeLoginCompanySelector.class);
+                            intent.putExtra("employeeEmail", employeeEmail);
+                            intent.putStringArrayListExtra("companies", companies);
+                            startActivity(intent);
+                            finish();
+                        }
                     }
-                }
 
-                if (companies.size() == 0) {
-                    showLoading(false);
-                    Toast.makeText(LoginActivity.this, "Invalid credentials ❌", Toast.LENGTH_SHORT).show();
-                } else if (companies.size() > 1) {
-                    showCompanySelector(employeeEmail, companies);
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                showLoading(false);
-            }
-        });
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        showLoading(false);
+                        Toast.makeText(LoginActivity.this,
+                                error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     private void showCompanySelector(String email, ArrayList<String> companies) {
@@ -180,7 +215,6 @@ public class LoginActivity extends AppCompatActivity {
         intent.putStringArrayListExtra("companies", companies);
         startActivity(intent);
     }
-
 
     private void goToAdminDashboard() {
         showLoading(false);
@@ -199,6 +233,7 @@ public class LoginActivity extends AppCompatActivity {
     private void showLoading(boolean loading) {
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         btnLogin.setEnabled(!loading);
+        btnLogin.setText(loading ? "Logging in..." : "Login");
         etEmail.setEnabled(!loading);
         etPassword.setEnabled(!loading);
     }
@@ -207,4 +242,3 @@ public class LoginActivity extends AppCompatActivity {
         Toast.makeText(this, "Contact your admin", Toast.LENGTH_SHORT).show();
     }
 }
-

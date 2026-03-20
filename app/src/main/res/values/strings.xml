@@ -1,3 +1,64 @@
 <resources>
     <string name="app_name">AttendSmart</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="nav_open">Open navigation</string>
+    <string name="nav_close">Close navigation</string>
+    <string name="open_drawer">Open navigation menu</string>
+    <string name="close_drawer">Close navigation menu</string>
+
+    <!-- Navigation Menu -->
+    <string name="dashboard">Dashboard</string>
+    <string name="employees">Employees</string>
+    <string name="departments">Departments</string>
+    <string name="shifts">Shifts</string>
+    <string name="attendance">Attendance</string>
+    <string name="leave_requests">Leave Requests</string>
+    <string name="reports">Reports</string>
+    <string name="payroll">Payroll</string>
+    <string name="view_salary">View Salary</string>
+    <string name="generate_salary">Generate Salary</string>
+    <string name="account">Account</string>
+    <string name="profile">Profile</string>
+    <string name="settings">Settings</string>
+    <string name="logout">Logout</string>
+
+    <string-array name="claim_status_filters">
+        <item>All</item>
+        <item>Pending</item>
+        <item>Approved</item>
+        <item>Rejected</item>
+    </string-array>
+
+    <string-array name="claim_status_values">
+        <item>all</item>
+        <item>pending</item>
+        <item>approved</item>
+        <item>rejected</item>
+    </string-array>
+
+    <string-array name="expense_categories">
+        <item>Travel</item>
+        <item>Hotel</item>
+        <item>Food</item>
+        <item>Stationery</item>
+        <item>Communication</item>
+        <item>Other</item>
+    </string-array>
+
+    <!-- Admin Claim Filters -->
+    <string-array name="admin_claim_status_filters">
+        <item>All Claims</item>
+        <item>Pending</item>
+        <item>Approved</item>
+        <item>Rejected</item>
+    </string-array>
+
+    <string-array name="admin_claim_status_values">
+        <item>all</item>
+        <item>pending</item>
+        <item>approved</item>
+        <item>rejected</item>
+    </string-array>
+
 </resources>

@@ -16,24 +16,23 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
-import com.google.firebase.storage.UploadTask;
+import com.sandhyyasofttech.attendsmart.Adapters.ExpenseItemAdapter;
 import com.sandhyyasofttech.attendsmart.Models.ExpenseClaim;
+import com.sandhyyasofttech.attendsmart.Models.ExpenseItem;
 import com.sandhyyasofttech.attendsmart.R;
 import com.sandhyyasofttech.attendsmart.Utils.ImageCompressor;
 import com.sandhyyasofttech.attendsmart.Utils.PrefManager;
 import java.io.File;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class EmployeeClaimActivity extends AppCompatActivity {
@@ -42,18 +41,29 @@ public class EmployeeClaimActivity extends AppCompatActivity {
     private static final int REQUEST_GALLERY = 101;
     private static final int PERMISSION_REQUEST_CODE = 102;
 
-    private EditText etAmount, etDescription;
-    private TextView tvImageName;
-    private ImageView ivBillPreview;
-    private Button btnSelectImage, btnSubmit;
+    // Views
+    private Spinner spinnerCategory;
+    private EditText etItemAmount, etItemDescription;
+    private Button btnAddItem, btnSubmitClaim;
+    private TextView tvTotalAmount;
+    private RecyclerView recyclerItems;
     private ProgressBar progressBar;
+    private LinearLayout addItemLayout;
 
-    private Uri selectedImageUri;
+    // Adapter and Data
+    private ExpenseItemAdapter itemAdapter;
+    private List<ExpenseItem> expenseItems = new ArrayList<>();
+    private DecimalFormat df = new DecimalFormat("#,##0.00");
+
+    // Temp storage for current item being added
+    private Uri currentBillImageUri;
+    private String currentBillImageUrl;
+    private boolean isAddingItem = false;
+
+    // Firebase
     private PrefManager prefManager;
     private DatabaseReference claimsRef;
     private StorageReference storageRef;
-
-    private boolean isSubmitting = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,363 +71,316 @@ public class EmployeeClaimActivity extends AppCompatActivity {
         setContentView(R.layout.activity_employee_claim);
 
         initViews();
+        setupRecyclerView();
 
-        // First check if user is logged in properly
         prefManager = new PrefManager(this);
 
-        // Validate user session
         if (!validateUserSession()) {
             return;
         }
 
         setupFirebase();
         setupClickListeners();
+
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("New Expense Claim");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+    }
+
+    private void initViews() {
+        spinnerCategory = findViewById(R.id.spinnerCategory);
+        etItemAmount = findViewById(R.id.etItemAmount);
+        etItemDescription = findViewById(R.id.etItemDescription);
+        btnAddItem = findViewById(R.id.btnAddItem);
+        btnSubmitClaim = findViewById(R.id.btnSubmitClaim);
+        tvTotalAmount = findViewById(R.id.tvTotalAmount);
+        recyclerItems = findViewById(R.id.recyclerItems);
+        progressBar = findViewById(R.id.progressBar);
+        addItemLayout = findViewById(R.id.addItemLayout);
+
+        // Setup category spinner
+        ArrayAdapter<CharSequence> categoryAdapter = ArrayAdapter.createFromResource(this,
+                R.array.expense_categories, android.R.layout.simple_spinner_item);
+        categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerCategory.setAdapter(categoryAdapter);
+    }
+
+    private void setupRecyclerView() {
+        itemAdapter = new ExpenseItemAdapter(position -> {
+            expenseItems.remove(position);
+            itemAdapter.removeItem(position);
+            updateTotalAmount();
+        });
+        recyclerItems.setLayoutManager(new LinearLayoutManager(this));
+        recyclerItems.setAdapter(itemAdapter);
     }
 
     private boolean validateUserSession() {
         String companyKey = prefManager.getCompanyKey();
-        String userId = prefManager.getUserId();
-
         if (companyKey == null || companyKey.isEmpty()) {
             Toast.makeText(this, "Session expired. Please login again.", Toast.LENGTH_LONG).show();
             finish();
             return false;
         }
-
-        if (userId == null || userId.isEmpty()) {
-            // Try to get employee ID
-            userId = prefManager.getEmployeeId();
-            if (userId == null || userId.isEmpty()) {
-                Toast.makeText(this, "User information missing. Please login again.", Toast.LENGTH_LONG).show();
-                finish();
-                return false;
-            }
-            prefManager.setUserId(userId);
-        }
-
         return true;
-    }
-    private void initViews() {
-        etAmount = findViewById(R.id.etAmount);
-        etDescription = findViewById(R.id.etDescription);
-        tvImageName = findViewById(R.id.tvImageName);
-        ivBillPreview = findViewById(R.id.ivBillPreview);
-        btnSelectImage = findViewById(R.id.btnSelectImage);
-        btnSubmit = findViewById(R.id.btnSubmit);
-        progressBar = findViewById(R.id.progressBar);
-
-        prefManager = new PrefManager(this);
-
-        // Set action bar title
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Submit Expense Claim");
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        }
     }
 
     private void setupFirebase() {
-        if (prefManager == null) {
-            prefManager = new PrefManager(this);
-        }
-
         String companyKey = prefManager.getCompanyKey();
-        if (companyKey == null || companyKey.isEmpty()) {
-            Toast.makeText(this, "Company information not found", Toast.LENGTH_LONG).show();
-            finish();
-            return;
-        }
-
         String userId = prefManager.getUserId();
+
         if (userId == null || userId.isEmpty()) {
             userId = prefManager.getEmployeeId();
             if (userId == null || userId.isEmpty()) {
                 userId = prefManager.getEmployeeMobile();
-                if (userId == null || userId.isEmpty()) {
-                    Toast.makeText(this, "User information missing", Toast.LENGTH_LONG).show();
-                    finish();
-                    return;
-                }
             }
-            prefManager.setUserId(userId);
+            if (userId != null && !userId.isEmpty()) {
+                prefManager.setUserId(userId);
+            }
         }
 
-        String userName = prefManager.getUserName();
-        if (userName == null || userName.isEmpty()) {
-            userName = prefManager.getEmployeeName();
-            if (userName == null || userName.isEmpty()) {
-                userName = "Employee";
-            }
-            prefManager.setUserName(userName);
-        }
-
-        // ✅ IMPORTANT: expenseClaims COMPANY च्या UNDER मध्ये ठेवा
-        // Path: Companies > companyKey > expenseClaims
         claimsRef = FirebaseDatabase.getInstance()
                 .getReference("Companies")
                 .child(companyKey)
                 .child("expenseClaims");
 
-        // Storage path same pattern
         storageRef = FirebaseStorage.getInstance()
                 .getReference("Companies")
                 .child(companyKey)
                 .child("expenseClaims")
                 .child(userId);
-
-        Log.d("ExpenseClaim", "Path: Companies/" + companyKey + "/expenseClaims");
     }
+
     private void setupClickListeners() {
-        btnSelectImage.setOnClickListener(v -> showImagePickerDialog());
-        btnSubmit.setOnClickListener(v -> submitClaim());
+        btnAddItem.setOnClickListener(v -> showAddItemDialog());
+        btnSubmitClaim.setOnClickListener(v -> submitClaim());
     }
 
-    private void showImagePickerDialog() {
-        String[] options = {"Camera", "Gallery"};
+    private void showAddItemDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Select Image");
-        builder.setItems(options, (dialog, which) -> {
-            if (which == 0) {
-                checkCameraPermission();
-            } else {
-                openGallery();
-            }
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_add_expense_item, null);
+        builder.setView(dialogView);
+
+        Spinner dialogSpinner = dialogView.findViewById(R.id.dialogSpinnerCategory);
+        EditText etAmount = dialogView.findViewById(R.id.dialogEtAmount);
+        EditText etDesc = dialogView.findViewById(R.id.dialogEtDescription);
+        Button btnSelectImage = dialogView.findViewById(R.id.dialogBtnSelectImage);
+        ImageView ivPreview = dialogView.findViewById(R.id.dialogIvPreview);
+        TextView tvImageName = dialogView.findViewById(R.id.dialogTvImageName);
+
+        // Setup spinner
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.expense_categories, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        dialogSpinner.setAdapter(adapter);
+
+        final Uri[] tempImageUri = {null};
+        final String[] tempImageUrl = {null};
+
+        btnSelectImage.setOnClickListener(v -> {
+            showImagePickerForItem((uri, url) -> {
+                tempImageUri[0] = uri;
+                tempImageUrl[0] = url;
+                if (uri != null) {
+                    Glide.with(this).load(uri).centerCrop().into(ivPreview);
+                    ivPreview.setVisibility(View.VISIBLE);
+                    tvImageName.setText("Image selected");
+                    tvImageName.setVisibility(View.VISIBLE);
+                }
+            });
         });
-        builder.show();
+
+        builder.setTitle("Add Expense Item")
+                .setPositiveButton("Add", (dialog, which) -> {
+                    String category = dialogSpinner.getSelectedItem().toString();
+                    String amountStr = etAmount.getText().toString().trim();
+                    String description = etDesc.getText().toString().trim();
+
+                    if (TextUtils.isEmpty(amountStr)) {
+                        Toast.makeText(this, "Enter amount", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    double amount;
+                    try {
+                        amount = Double.parseDouble(amountStr);
+                        if (amount <= 0) {
+                            Toast.makeText(this, "Amount must be > 0", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (TextUtils.isEmpty(description)) {
+                        Toast.makeText(this, "Enter description", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (tempImageUri[0] == null) {
+                        Toast.makeText(this, "Please select bill image", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    // Upload image and add item
+                    uploadItemImageAndAdd(category, amount, description, tempImageUri[0]);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
-    private void checkCameraPermission() {
+    private void uploadItemImageAndAdd(String category, double amount, String description, Uri imageUri) {
+        showProgress(true);
+        String fileName = UUID.randomUUID().toString() + ".jpg";
+        StorageReference imageRef = storageRef.child("items").child(fileName);
+
+        try {
+            File compressedFile = ImageCompressor.saveCompressedImage(this, imageUri, fileName);
+            Uri compressedUri = Uri.fromFile(compressedFile);
+
+            imageRef.putFile(compressedUri)
+                    .addOnSuccessListener(taskSnapshot -> {
+                        imageRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                            ExpenseItem item = new ExpenseItem(category, amount, description, uri.toString());
+                            expenseItems.add(item);
+                            itemAdapter.addItem(item);
+                            updateTotalAmount();
+                            showProgress(false);
+                            Toast.makeText(this, "Item added", Toast.LENGTH_SHORT).show();
+                        }).addOnFailureListener(e -> {
+                            showProgress(false);
+                            Toast.makeText(this, "Failed to get image URL", Toast.LENGTH_SHORT).show();
+                        });
+                    })
+                    .addOnFailureListener(e -> {
+                        showProgress(false);
+                        Toast.makeText(this, "Image upload failed", Toast.LENGTH_SHORT).show();
+                    });
+        } catch (Exception e) {
+            showProgress(false);
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showImagePickerForItem(OnImageSelectedListener listener) {
+        String[] options = {"Camera", "Gallery"};
+        new AlertDialog.Builder(this)
+                .setTitle("Select Bill Image")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        checkCameraPermissionForItem(listener);
+                    } else {
+                        openGalleryForItem(listener);
+                    }
+                })
+                .show();
+    }
+
+    private void checkCameraPermissionForItem(OnImageSelectedListener listener) {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{android.Manifest.permission.CAMERA},
                     PERMISSION_REQUEST_CODE);
         } else {
-            openCamera();
+            openCameraForItem(listener);
         }
     }
 
-    private void openCamera() {
+    private void openCameraForItem(OnImageSelectedListener listener) {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         startActivityForResult(intent, REQUEST_CAMERA);
+        currentImageListener = listener;
     }
 
-    private void openGallery() {
+    private void openGalleryForItem(OnImageSelectedListener listener) {
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         startActivityForResult(intent, REQUEST_GALLERY);
+        currentImageListener = listener;
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                openCamera();
-            } else {
-                Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show();
-            }
-        }
+    private OnImageSelectedListener currentImageListener;
+
+    interface OnImageSelectedListener {
+        void onImageSelected(Uri uri, String url);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (resultCode == RESULT_OK) {
+        if (resultCode == RESULT_OK && currentImageListener != null) {
             if (requestCode == REQUEST_CAMERA && data != null && data.getExtras() != null) {
-                // Handle camera image
                 android.graphics.Bitmap bitmap = (android.graphics.Bitmap) data.getExtras().get("data");
                 if (bitmap != null) {
-                    selectedImageUri = getImageUriFromBitmap(bitmap);
-                    displayImagePreview(selectedImageUri);
+                    String path = MediaStore.Images.Media.insertImage(getContentResolver(), bitmap, "BillImage", null);
+                    currentImageListener.onImageSelected(Uri.parse(path), null);
                 }
             } else if (requestCode == REQUEST_GALLERY && data != null && data.getData() != null) {
-                selectedImageUri = data.getData();
-                displayImagePreview(selectedImageUri);
+                currentImageListener.onImageSelected(data.getData(), null);
             }
+            currentImageListener = null;
         }
     }
 
-    private Uri getImageUriFromBitmap(android.graphics.Bitmap bitmap) {
-        String path = MediaStore.Images.Media.insertImage(getContentResolver(), bitmap, "BillImage", null);
-        return Uri.parse(path);
-    }
-
-    private void displayImagePreview(Uri imageUri) {
-        Glide.with(this)
-                .load(imageUri)
-                .centerCrop()
-                .into(ivBillPreview);
-        ivBillPreview.setVisibility(View.VISIBLE);
-
-        String fileName = getFileNameFromUri(imageUri);
-        tvImageName.setText(fileName != null ? fileName : "Image selected");
-        tvImageName.setVisibility(View.VISIBLE);
-    }
-
-    private String getFileNameFromUri(Uri uri) {
-        String fileName = null;
-        if (uri.getScheme().equals("content")) {
-            try (Cursor cursor = getContentResolver().query(uri, null, null, null, null)) {
-                if (cursor != null && cursor.moveToFirst()) {
-                    int nameIndex = cursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME);
-                    if (nameIndex != -1) {
-                        fileName = cursor.getString(nameIndex);
-                    }
-                }
-            }
+    private void updateTotalAmount() {
+        double total = 0;
+        for (ExpenseItem item : expenseItems) {
+            total += item.getAmount();
         }
-        if (fileName == null) {
-            fileName = uri.getPath();
-            int cut = fileName.lastIndexOf('/');
-            if (cut != -1) {
-                fileName = fileName.substring(cut + 1);
-            }
-        }
-        return fileName;
+        tvTotalAmount.setText("Total: ₹" + df.format(total));
     }
 
     private void submitClaim() {
-        if (isSubmitting) {
-            Toast.makeText(this, "Please wait, already submitting...", Toast.LENGTH_SHORT).show();
+        if (expenseItems.isEmpty()) {
+            Toast.makeText(this, "Please add at least one expense item", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String amountStr = etAmount.getText().toString().trim();
-        String description = etDescription.getText().toString().trim();
-
-        // Validation
-        if (TextUtils.isEmpty(amountStr)) {
-            etAmount.setError("Amount is required");
-            etAmount.requestFocus();
-            return;
-        }
-
-        double amount;
-        try {
-            amount = Double.parseDouble(amountStr);
-            if (amount <= 0) {
-                etAmount.setError("Amount must be greater than 0");
-                etAmount.requestFocus();
-                return;
-            }
-            if (amount > 100000) {
-                etAmount.setError("Amount is too high. Please contact admin");
-                etAmount.requestFocus();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            etAmount.setError("Invalid amount");
-            etAmount.requestFocus();
-            return;
-        }
-
-        if (TextUtils.isEmpty(description)) {
-            etDescription.setError("Description is required");
-            etDescription.requestFocus();
-            return;
-        }
-
-        if (description.length() < 10) {
-            etDescription.setError("Please provide more details (min 10 characters)");
-            etDescription.requestFocus();
-            return;
-        }
-
-        if (selectedImageUri == null) {
-            Toast.makeText(this, "Please select a bill image", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // All validations passed
-        isSubmitting = true;
+        if (isAddingItem) return;
+        isAddingItem = true;
         showProgress(true);
 
-        // Upload image first
-        uploadImageAndSaveClaim(amount, description);
-    }
-
-    private void uploadImageAndSaveClaim(double amount, String description) {
-        String imageFileName = UUID.randomUUID().toString() + ".jpg";
-        StorageReference imageRef = storageRef.child(imageFileName);
-
-        try {
-            // Compress image before upload
-            File compressedFile = ImageCompressor.saveCompressedImage(this, selectedImageUri, imageFileName);
-            Uri compressedUri = Uri.fromFile(compressedFile);
-
-            imageRef.putFile(compressedUri)
-                    .addOnSuccessListener(taskSnapshot -> {
-                        imageRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                            String imageUrl = uri.toString();
-                            saveClaimToDatabase(amount, description, imageUrl);
-                        }).addOnFailureListener(e -> {
-                            showError("Failed to get image URL: " + e.getMessage());
-                        });
-                    })
-                    .addOnFailureListener(e -> {
-                        showError("Image upload failed: " + e.getMessage());
-                    });
-        } catch (Exception e) {
-            showError("Image compression failed: " + e.getMessage());
-        }
-    }
-
-    private void saveClaimToDatabase(double amount, String description, String imageUrl) {
         String claimId = claimsRef.push().getKey();
         if (claimId == null) {
             showError("Failed to generate claim ID");
             return;
         }
 
-        String timestamp = String.valueOf(System.currentTimeMillis());
         String userId = prefManager.getUserId();
         String userName = prefManager.getUserName();
 
         if (TextUtils.isEmpty(userName)) {
             userName = prefManager.getEmployeeName();
+            if (TextUtils.isEmpty(userName)) userName = "Employee";
         }
 
         ExpenseClaim claim = new ExpenseClaim();
         claim.setClaimId(claimId);
         claim.setUserId(userId);
         claim.setUserName(userName);
-        claim.setAmount(amount);
-        claim.setDescription(description);
-        claim.setImageUrl(imageUrl);
+        claim.setItems(expenseItems);
         claim.setStatus("pending");
-        claim.setTimestamp(timestamp);
+        claim.setTimestamp(String.valueOf(System.currentTimeMillis()));
 
         claimsRef.child(claimId).setValue(claim)
                 .addOnSuccessListener(aVoid -> {
                     showProgress(false);
-                    isSubmitting = false;
-                    Toast.makeText(EmployeeClaimActivity.this,
-                            "Claim submitted successfully!", Toast.LENGTH_LONG).show();
-
-                    // Clear form
-                    etAmount.setText("");
-                    etDescription.setText("");
-                    selectedImageUri = null;
-                    ivBillPreview.setVisibility(View.GONE);
-                    tvImageName.setVisibility(View.GONE);
-
-                    // Finish after 2 seconds
-                    new android.os.Handler().postDelayed(() -> finish(), 2000);
+                    Toast.makeText(this, "Claim submitted successfully!", Toast.LENGTH_LONG).show();
+                    new android.os.Handler().postDelayed(this::finish, 2000);
                 })
                 .addOnFailureListener(e -> {
                     showError("Failed to save claim: " + e.getMessage());
                     showProgress(false);
-                    isSubmitting = false;
+                    isAddingItem = false;
                 });
     }
 
     private void showError(String message) {
         showProgress(false);
-        isSubmitting = false;
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-
-        // Show retry option
+        isAddingItem = false;
         new AlertDialog.Builder(this)
                 .setTitle("Error")
                 .setMessage(message + "\n\nDo you want to retry?")
@@ -428,10 +391,8 @@ public class EmployeeClaimActivity extends AppCompatActivity {
 
     private void showProgress(boolean show) {
         progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
-        btnSubmit.setEnabled(!show);
-        btnSelectImage.setEnabled(!show);
-        etAmount.setEnabled(!show);
-        etDescription.setEnabled(!show);
+        btnSubmitClaim.setEnabled(!show);
+        btnAddItem.setEnabled(!show);
     }
 
     @Override

@@ -1,32 +1,22 @@
 package com.sandhyyasofttech.attendsmart.Models;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ExpenseClaim {
     private String claimId;
     private String userId;
     private String userName;
-    private double amount;
-    private String description;
-    private String imageUrl;
-    private String status;
+    private double totalAmount;
+    private List<ExpenseItem> items;
+    private String status; // pending, approved, rejected
     private String timestamp;
     private String adminRemarks;
     private String approvedBy;
     private String approvedAt;
 
     public ExpenseClaim() {
-        // Default constructor required for Firebase
-    }
-
-    public ExpenseClaim(String claimId, String userId, String userName, double amount, 
-                        String description, String imageUrl, String status, String timestamp) {
-        this.claimId = claimId;
-        this.userId = userId;
-        this.userName = userName;
-        this.amount = amount;
-        this.description = description;
-        this.imageUrl = imageUrl;
-        this.status = status;
-        this.timestamp = timestamp;
+        this.items = new ArrayList<>();
     }
 
     // Getters and Setters
@@ -39,14 +29,27 @@ public class ExpenseClaim {
     public String getUserName() { return userName; }
     public void setUserName(String userName) { this.userName = userName; }
 
-    public double getAmount() { return amount; }
-    public void setAmount(double amount) { this.amount = amount; }
+    public double getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
 
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    public String getImageUrl() { return imageUrl; }
-    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public List<ExpenseItem> getItems() { return items; }
+    public void setItems(List<ExpenseItem> items) { 
+        this.items = items;
+        calculateTotal();
+    }
+    
+    public void addItem(ExpenseItem item) {
+        this.items.add(item);
+        calculateTotal();
+    }
+    
+    private void calculateTotal() {
+        double total = 0;
+        for (ExpenseItem item : items) {
+            total += item.getAmount();
+        }
+        this.totalAmount = total;
+    }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

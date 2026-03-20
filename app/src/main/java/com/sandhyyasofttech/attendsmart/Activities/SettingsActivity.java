@@ -62,7 +62,9 @@ public class SettingsActivity extends AppCompatActivity {
     private static final int NOTIFICATION_PERMISSION_CODE = 101;
     private static final int PICK_IMAGE_REQUEST = 1001;
     private Uri selectedImageUri;
-
+    // Existing variables सोबत हे add करा
+    private View cardSubmitClaim;
+    private View cardMyClaims;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,6 +111,9 @@ public class SettingsActivity extends AppCompatActivity {
         carddocument  = findViewById(R.id.carddocument);
         cardAddTodaysWork = findViewById(R.id.cardAddTodaysWork);
         cardViewWork = findViewById(R.id.cardViewWork);
+
+        cardSubmitClaim = findViewById(R.id.cardSubmitClaim);
+        cardMyClaims = findViewById(R.id.cardMyClaims);
     }
 
 
@@ -368,6 +373,64 @@ public class SettingsActivity extends AppCompatActivity {
                 Intent intent = new Intent(SettingsActivity.this, ApplyLeaveActivity.class);
                 intent.putExtra("companyKey", companyKey);
                 intent.putExtra("employeeMobile", employeeMobile);
+                startActivity(intent);
+            });
+        }
+
+        // Add Expense Claim Click Listeners
+        // Add Expense Claim Click Listeners
+        if (cardSubmitClaim != null) {
+            cardSubmitClaim.setOnClickListener(v -> {
+                // First ensure we have all required data
+                String userId = pref.getUserId();
+                String employeeId = pref.getEmployeeId();
+                String employeeMobile = pref.getEmployeeMobile();
+
+                // Log for debugging
+                android.util.Log.d("SettingsActivity", "UserId: " + userId);
+                android.util.Log.d("SettingsActivity", "EmployeeId: " + employeeId);
+                android.util.Log.d("SettingsActivity", "EmployeeMobile: " + employeeMobile);
+
+                // Try to get userId from different sources
+                if (userId == null || userId.isEmpty()) {
+                    // Try to use employeeId
+                    if (employeeId != null && !employeeId.isEmpty()) {
+                        pref.setUserId(employeeId);
+                        userId = employeeId;
+                    }
+                    // If still null, try to use employeeMobile as userId
+                    else if (employeeMobile != null && !employeeMobile.isEmpty()) {
+                        pref.setUserId(employeeMobile);
+                        userId = employeeMobile;
+                    }
+                    else {
+                        Toast.makeText(SettingsActivity.this,
+                                "Unable to find user information. Please logout and login again.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                }
+
+                // Also ensure userName is set
+                String userName = pref.getUserName();
+                if (userName == null || userName.isEmpty()) {
+                    String empName = pref.getEmployeeName();
+                    if (empName != null && !empName.isEmpty()) {
+                        pref.setUserName(empName);
+                    } else {
+                        pref.setUserName("Employee");
+                    }
+                }
+
+                // Now launch the activity
+                Intent intent = new Intent(SettingsActivity.this, EmployeeClaimActivity.class);
+                startActivity(intent);
+            });
+        }
+
+        if (cardMyClaims != null) {
+            cardMyClaims.setOnClickListener(v -> {
+                Intent intent = new Intent(SettingsActivity.this, EmployeeClaimListActivity.class);
                 startActivity(intent);
             });
         }

@@ -40,9 +40,16 @@
         <activity
             android:name=".Activities.EmployeeClaimActivity"
             android:exported="false" />
+        <!-- Add these activities inside <application> tag -->
         <activity
-            android:name=".Subscription.SubscriptionSelectActivity"
-            android:exported="false" />
+            android:name=".Activities.AdminClaimListActivity"
+            android:parentActivityName=".Settings.SettingsActivity" />
+
+        <activity
+            android:name=".Activities.AdminClaimDetailActivity"
+            android:parentActivityName=".Activities.AdminClaimListActivity" />
+
+
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"

@@ -81,14 +81,15 @@ public class AdminClaimListActivity extends AppCompatActivity {
 
     private boolean validateAdminSession() {
         String userType = prefManager.getUserType();
-        if (userType == null || !userType.equals("admin")) {
+
+        if (userType == null || !userType.equalsIgnoreCase("admin")) {
             Toast.makeText(this, "Admin access required", Toast.LENGTH_LONG).show();
             finish();
             return false;
         }
+
         return true;
     }
-
     private void setupFirebase() {
         String companyKey = prefManager.getCompanyKey();
 

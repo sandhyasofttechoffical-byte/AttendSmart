@@ -384,6 +384,7 @@
 
 
 
+
 package com.sandhyyasofttech.attendsmart.Settings;
 
 import android.content.Intent;
@@ -414,6 +415,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.sandhyyasofttech.attendsmart.Activities.AdminClaimListActivity;
 import com.sandhyyasofttech.attendsmart.Activities.AdminDocumentsDashboardActivity;
 import com.sandhyyasofttech.attendsmart.Activities.EmployeeSelectionActivity;
 import com.sandhyyasofttech.attendsmart.Activities.ExportDataActivity;
@@ -440,6 +442,9 @@ public class SettingsActivity extends AppCompatActivity {
     private DatabaseReference companyRef;
     private String companyKey;
     private PrefManager pref;
+    // Add with other card variables
+    private LinearLayout cardViewAllClaims;
+    private TextView tvPendingCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -479,6 +484,8 @@ public class SettingsActivity extends AppCompatActivity {
 
         tvAppVersion = findViewById(R.id.tvAppVersion);
         btnLogout = findViewById(R.id.btnLogout);
+        cardViewAllClaims = findViewById(R.id.cardViewAllClaims);
+        tvPendingCount = findViewById(R.id.tvPendingCount);
 
         // Set app version
         try {
@@ -542,8 +549,36 @@ public class SettingsActivity extends AppCompatActivity {
 
         // Load Biometric Setting (from SharedPreferences)
         switchBiometric.setChecked(pref.isBiometricEnabled());
+        loadPendingClaimsCount();
+
     }
 
+
+    private void loadPendingClaimsCount() {
+        DatabaseReference claimsRef = FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("expenseClaims");
+
+        claimsRef.orderByChild("status").equalTo("pending")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        long pendingCount = snapshot.getChildrenCount();
+                        if (pendingCount > 0 && tvPendingCount != null) {
+                            tvPendingCount.setText(String.valueOf(pendingCount));
+                            tvPendingCount.setVisibility(View.VISIBLE);
+                        } else if (tvPendingCount != null) {
+                            tvPendingCount.setVisibility(View.GONE);
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        // Handle error
+                    }
+                });
+    }
     private void setupListeners() {
         // Attendance Notification Switch
         switchAttendance.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -556,6 +591,13 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
+
+        if (cardViewAllClaims != null) {
+            cardViewAllClaims.setOnClickListener(v -> {
+                Intent intent = new Intent(SettingsActivity.this, AdminClaimListActivity.class);
+                startActivity(intent);
+            });
+        }
         // Leave Notification Switch
         switchLeaveNotifications.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (buttonView.isPressed()) {

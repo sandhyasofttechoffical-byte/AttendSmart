@@ -337,6 +337,10 @@ public class AdminDashboardActivity extends AppCompatActivity {
         TextView btnDismiss = dialogView.findViewById(R.id.btnDismiss);
         btnDismiss.setOnClickListener(v -> dialog.dismiss());
 
+        // Add click listener for close vector icon
+        ImageView ivCloseDialog = dialogView.findViewById(R.id.ivCloseDialog);
+        ivCloseDialog.setOnClickListener(v -> dialog.dismiss());
+
         dialog.show();
     }
 

@@ -7,6 +7,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
@@ -159,11 +160,26 @@ public class ApplyLeaveActivity extends AppCompatActivity {
                 halfDayType = null;
             }
         });
-        tvFromDate.setOnClickListener(v -> pickDate(true));
-        tvToDate.setOnClickListener(v   -> pickDate(false));
-        btnSubmit.setOnClickListener(v  -> submitLeave());
-    }
 
+        // Option 1: Using the parent LinearLayout (llFromDate and llToDate)
+        LinearLayout llFromDate = findViewById(R.id.llFromDate);
+        LinearLayout llToDate = findViewById(R.id.llToDate);
+
+        llFromDate.setOnClickListener(v -> pickDate(true));
+        llToDate.setOnClickListener(v -> pickDate(false));
+
+        // Option 2: Using the inner LinearLayouts (formd and tod)
+        // Uncomment these lines if you prefer using formd and tod instead
+    /*
+    LinearLayout formd = findViewById(R.id.formd);
+    LinearLayout tod = findViewById(R.id.tod);
+
+    formd.setOnClickListener(v -> pickDate(true));
+    tod.setOnClickListener(v -> pickDate(false));
+    */
+
+        btnSubmit.setOnClickListener(v -> submitLeave());
+    }
     private void pickDate(boolean isFrom) {
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.DAY_OF_MONTH, 1);

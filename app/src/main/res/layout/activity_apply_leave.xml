@@ -176,6 +176,7 @@
                                 android:layout_marginEnd="14dp" />
 
                             <LinearLayout
+                                android:id="@+id/formd"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
@@ -203,7 +204,7 @@
                                 android:layout_width="18dp"
                                 android:layout_height="18dp"
                                 android:src="@drawable/ic_chevron_right"
-                                app:tint="#95A5A6" />
+                                app:tint="#1D1D1D" />
                         </LinearLayout>
 
                         <!-- Divider -->
@@ -233,6 +234,7 @@
                                 android:layout_marginEnd="14dp" />
 
                             <LinearLayout
+                                android:id="@+id/tod"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
@@ -260,7 +262,7 @@
                                 android:layout_width="18dp"
                                 android:layout_height="18dp"
                                 android:src="@drawable/ic_chevron_right"
-                                app:tint="#95A5A6" />
+                                app:tint="#1D1D1D" />
                         </LinearLayout>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>

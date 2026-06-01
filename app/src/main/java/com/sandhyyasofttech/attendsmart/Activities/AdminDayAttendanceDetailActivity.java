@@ -28,6 +28,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.sandhyyasofttech.attendsmart.R;
+import com.sandhyyasofttech.attendsmart.Utils.ZoomableImageView;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -540,10 +541,10 @@ public class AdminDayAttendanceDetailActivity extends AppCompatActivity {
         etCheckIn.setOnClickListener(v -> openTimePicker(etCheckIn, session, true, tvSessionDuration));
         etCheckOut.setOnClickListener(v -> openTimePicker(etCheckOut, session, false, tvSessionDuration));
 
-        // Photo click listeners
+        // Replace the existing photo click listeners with these:
         cardCheckInPhoto.setOnClickListener(v -> {
             if (session.checkInPhoto != null && !session.checkInPhoto.isEmpty()) {
-                openImageInGallery(session.checkInPhoto);
+                showImageInDialog(session.checkInPhoto);
             } else {
                 Toast.makeText(AdminDayAttendanceDetailActivity.this, "No check-in photo available", Toast.LENGTH_SHORT).show();
             }
@@ -551,7 +552,7 @@ public class AdminDayAttendanceDetailActivity extends AppCompatActivity {
 
         cardCheckOutPhoto.setOnClickListener(v -> {
             if (session.checkOutPhoto != null && !session.checkOutPhoto.isEmpty()) {
-                openImageInGallery(session.checkOutPhoto);
+                showImageInDialog(session.checkOutPhoto);
             } else {
                 Toast.makeText(AdminDayAttendanceDetailActivity.this, "No check-out photo available", Toast.LENGTH_SHORT).show();
             }
@@ -825,7 +826,37 @@ public class AdminDayAttendanceDetailActivity extends AppCompatActivity {
         }
         return 0;
     }
+    private void showImageInDialog(String imageUrl) {
+        if (imageUrl == null || imageUrl.isEmpty()) {
+            Toast.makeText(this, "No image available", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
+        // Create dialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_image_viewer, null);
+        builder.setView(dialogView);
+
+        ZoomableImageView ivFullImage = dialogView.findViewById(R.id.ivFullImage);
+        MaterialButton btnClose = dialogView.findViewById(R.id.btnClose);
+
+        // Load image using Glide
+        Glide.with(this)
+                .load(imageUrl)
+                .placeholder(R.drawable.ic_image_placeholder)
+                .error(R.drawable.ic_image_placeholder)
+                .into(ivFullImage);
+
+        AlertDialog dialog = builder.create();
+
+        // Close button click listener
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+
+        // Click anywhere outside to close
+        dialog.setCanceledOnTouchOutside(true);
+
+        dialog.show();
+    }
     private void showDeletePopup() {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Attendance")

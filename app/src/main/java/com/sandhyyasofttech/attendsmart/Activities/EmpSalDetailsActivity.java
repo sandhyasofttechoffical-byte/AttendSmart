@@ -57,6 +57,7 @@ public class EmpSalDetailsActivity extends AppCompatActivity {
         Log.d("SALARY", "Mobile: " + mobile);
         Log.d("SALARY", "Month: " + month);
 
+
         tvMonth = findViewById(R.id.tvMonth);
         tvMonth.setText(formatMonth(month));
 

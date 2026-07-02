@@ -20,6 +20,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.sandhyyasofttech.attendsmart.Activities.EmployeeDashboardActivity;
 import com.sandhyyasofttech.attendsmart.Activities.NoInternetActivity;
+import com.sandhyyasofttech.attendsmart.Subscription.SubscriptionSelectActivity;
 import com.sandhyyasofttech.attendsmart.Utils.PrefManager;
 import com.sandhyyasofttech.attendsmart.R;
 import androidx.core.animation.Animator;
@@ -143,47 +144,154 @@ public class SplashActivity extends AppCompatActivity {
         }
 
         if (userType.equals("ADMIN")) {
-            String safeEmail = email.replace(".", ",");
-            rootRef.child(safeEmail).child("companyInfo").child("status")
-                    .get()
-                    .addOnSuccessListener(snapshot -> {
-                        String status = snapshot.getValue(String.class);
-                        if ("ACTIVE".equals(status)) {
-                            startActivity(new Intent(this, AdminDashboardActivity.class));
-                        } else {
-                            prefManager.logout();
-                            Toast.makeText(this, "Please contact your Admin ❌", Toast.LENGTH_LONG).show();
-                            navigateToLogin();
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        prefManager.logout();
-                        Toast.makeText(this, "Check internet or login again ❌", Toast.LENGTH_LONG).show();
-                        navigateToLogin();
-                    });
 
-        } else if (userType.equals("EMPLOYEE")) {
-            rootRef.child(companyKey).child("employees").child(prefManager.getEmployeeMobile())
-                    .child("info").child("employeeStatus")
+            rootRef.child(companyKey)
+                    .child("subscription")
                     .get()
-                    .addOnSuccessListener(snapshot -> {
-                        String status = snapshot.getValue(String.class);
-                        if ("ACTIVE".equals(status)) {
-                            Intent intent = new Intent(this, EmployeeDashboardActivity.class);
-                            intent.putExtra("companyKey", companyKey);
-                            startActivity(intent);
-                        } else {
-                            prefManager.logout();
-                            Toast.makeText(this, "Your account is disabled! Contact Admin ❌", Toast.LENGTH_LONG).show();
-                            navigateToLogin();
+                    .addOnSuccessListener(subSnapshot -> {
+
+                        // 🔴 CASE 1: Subscription node NOT exists
+                        if (!subSnapshot.exists()) {
+                            startActivity(new Intent(this,
+                                    SubscriptionSelectActivity.class));
+                            finish();
+                            return;
                         }
+
+                        String status =
+                                subSnapshot.child("status").getValue(String.class);
+
+                        String paymentStatus =
+                                subSnapshot.child("paymentStatus").getValue(String.class);
+
+                        Boolean isTrial =
+                                subSnapshot.child("isTrial").getValue(Boolean.class);
+
+                        Long endDateMillisObj =
+                                subSnapshot.child("endDateMillis").getValue(Long.class);
+
+                        long endDateMillis = endDateMillisObj != null ? endDateMillisObj : 0;
+
+                        if (!isSubscriptionActive(
+                                endDateMillis,
+                                status,
+                                paymentStatus,
+                                isTrial != null && isTrial
+                        )) {
+                            startActivity(new Intent(this, SubscriptionSelectActivity.class));
+                            finish();
+                            return;
+                        }
+
+
+                        // 🟢 CASE 3: Subscription ACTIVE
+                        startActivity(new Intent(this,
+                                AdminDashboardActivity.class));
+                        finish();
+
+                    })
+                    .addOnFailureListener(e -> {
+                        Toast.makeText(this,
+                                "Unable to verify subscription",
+                                Toast.LENGTH_LONG).show();
+                        navigateToLogin();
+                    });
+        }
+
+        else if (userType.equals("EMPLOYEE")) {
+
+            rootRef.child(companyKey)
+                    .child("employees")
+                    .child(prefManager.getEmployeeMobile())
+                    .child("info")
+                    .child("employeeStatus")
+                    .get()
+                    .addOnSuccessListener(empSnapshot -> {
+
+                        String empStatus = empSnapshot.getValue(String.class);
+
+                        // ❌ Employee inactive / not found
+                        if (!"ACTIVE".equals(empStatus)) {
+                            prefManager.logout();
+                            Toast.makeText(this,
+                                    "Your account is disabled! Contact Admin ❌",
+                                    Toast.LENGTH_LONG).show();
+                            navigateToLogin();
+                            return;
+                        }
+
+                        // ✅ Employee ACTIVE → now check company subscription
+                        rootRef.child(companyKey)
+                                .child("subscription")
+                                .get()
+                                .addOnSuccessListener(subSnapshot -> {
+
+                                    // ❌ No subscription
+                                    if (!subSnapshot.exists()) {
+                                        prefManager.logout();
+                                        Toast.makeText(this,
+                                                "Company subscription not active ❌",
+                                                Toast.LENGTH_LONG).show();
+                                        navigateToLogin();
+                                        return;
+                                    }
+
+                                    String status =
+                                            subSnapshot.child("status").getValue(String.class);
+
+                                    String paymentStatus =
+                                            subSnapshot.child("paymentStatus").getValue(String.class);
+
+                                    Boolean isTrial =
+                                            subSnapshot.child("isTrial").getValue(Boolean.class);
+
+                                    Long endDateMillisObj =
+                                            subSnapshot.child("endDateMillis").getValue(Long.class);
+
+                                    long endDateMillis = endDateMillisObj != null ? endDateMillisObj : 0;
+
+                                    if (!isSubscriptionActive(
+                                            endDateMillis,
+                                            status,
+                                            paymentStatus,
+                                            isTrial != null && isTrial
+                                    )) {
+                                        prefManager.logout();
+                                        Toast.makeText(this,
+                                                "Company subscription inactive ❌",
+                                                Toast.LENGTH_LONG).show();
+                                        navigateToLogin();
+                                        return;
+                                    }
+
+
+                                    // ✅ ALL GOOD → Employee dashboard
+                                    Intent intent = new Intent(this,
+                                            EmployeeDashboardActivity.class);
+                                    intent.putExtra("companyKey", companyKey);
+                                    startActivity(intent);
+                                    finish();
+
+                                })
+                                .addOnFailureListener(e -> {
+                                    prefManager.logout();
+                                    Toast.makeText(this,
+                                            "Unable to verify company subscription ❌",
+                                            Toast.LENGTH_LONG).show();
+                                    navigateToLogin();
+                                });
+
                     })
                     .addOnFailureListener(e -> {
                         prefManager.logout();
-                        Toast.makeText(this, "Data not loading! Login again ❌", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this,
+                                "Employee data not loading! Login again ❌",
+                                Toast.LENGTH_LONG).show();
                         navigateToLogin();
                     });
-        } else {
+        }
+
+        else {
             navigateToLogin();
         }
     }
@@ -229,5 +337,23 @@ public class SplashActivity extends AppCompatActivity {
             return info != null && info.isConnected();
         }
         return false;
+    }
+    private boolean isSubscriptionActive(
+            long endDateMillis,
+            String status,
+            String paymentStatus,
+            boolean isTrial
+    ) {
+        if (!"ACTIVE".equals(status)) return false;
+
+        // Trial users allowed if FREE
+        if (isTrial && "FREE".equals(paymentStatus)) {
+            return System.currentTimeMillis() <= endDateMillis;
+        }
+
+        // Paid plans MUST be PAID
+        if (!"PAID".equals(paymentStatus)) return false;
+
+        return System.currentTimeMillis() <= endDateMillis;
     }
 }

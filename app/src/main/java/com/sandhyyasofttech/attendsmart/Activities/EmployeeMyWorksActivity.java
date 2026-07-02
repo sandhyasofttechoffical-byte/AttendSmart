@@ -50,7 +50,6 @@
 //        toolbar.setTitle("My Today's Work");
 //
 //        rvMyWorks.setLayoutManager(new LinearLayoutManager(this));
-//        adapter = new EmployeeWorkAdapter(this);
 //        rvMyWorks.setAdapter(adapter);
 //        findViewById(R.id.btnAddWork).setOnClickListener(v -> {
 //            startActivity(new Intent(this, EmployeeTodayWorkActivity.class));

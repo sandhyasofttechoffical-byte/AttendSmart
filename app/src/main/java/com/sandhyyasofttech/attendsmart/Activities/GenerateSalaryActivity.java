@@ -3,6 +3,7 @@ package com.sandhyyasofttech.attendsmart.Activities;
 import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -28,9 +29,12 @@ import com.sandhyyasofttech.attendsmart.R;
 import com.sandhyyasofttech.attendsmart.Utils.PrefManager;
 import com.sandhyyasofttech.attendsmart.payroll.SalaryCalculator;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 
 public class GenerateSalaryActivity extends AppCompatActivity {
 
@@ -77,6 +81,312 @@ public class GenerateSalaryActivity extends AppCompatActivity {
         btnGenerate.setOnClickListener(v -> validateAndGenerate());
     }
 
+    // GenerateSalaryActivity मध्ये add कर
+    private void fetchEmployeeWeeklyHoliday(String employeeMobile, HolidayCallback callback) {
+        companyRef.child("employees")
+                .child(employeeMobile)
+                .child("info")
+                .child("weeklyHoliday")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        String weeklyHoliday = snapshot.getValue(String.class);
+                        // "Sunday", "Monday", "Friday", "Saturday & Sunday", "None"
+                        callback.onSuccess(weeklyHoliday);
+                    }
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        callback.onError();
+                    }
+                });
+    }
+    private int calculateWorkingDaysForMonth(String month, String weeklyHoliday, String employeeMobile) {
+        // month format: "MM-yyyy" e.g., "01-2026"
+        String[] parts = month.split("-");
+        int monthNum = Integer.parseInt(parts[0]);  // 1-12
+        int year = Integer.parseInt(parts[1]);
+
+        Calendar cal = Calendar.getInstance();
+        cal.set(year, monthNum - 1, 1);
+        int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+
+        // Parse weekly holiday
+        Set<Integer> weeklyOffDays = parseWeeklyHoliday(weeklyHoliday);
+
+        // Fetch company holidays for this month
+        Set<String> companyHolidays = fetchCompanyHolidaysForMonth(month);
+
+        int workingDays = 0;
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+        for (int day = 1; day <= daysInMonth; day++) {
+            cal.set(year, monthNum - 1, day);
+            int dayOfWeek = cal.get(Calendar.DAY_OF_WEEK);
+            String dateStr = String.format("%04d-%02d-%02d", year, monthNum, day);
+
+            // Check if weekly off
+            if (weeklyOffDays.contains(dayOfWeek)) {
+                continue;  // Weekly holiday - no salary
+            }
+
+            // Check if company holiday
+            if (companyHolidays.contains(dateStr)) {
+                continue;  // Public holiday - no salary
+            }
+
+            workingDays++;
+        }
+
+        return workingDays;
+    }
+    // ================= FETCH COMPANY HOLIDAYS =================
+    private Set<String> fetchCompanyHolidaysForMonth(String month) {
+        // ही method synchronous आहे, पण आपण असynchronous करू
+        // सध्या empty set return करतो, पुढे implement करू
+        Set<String> holidays = new HashSet<>();
+
+        // TODO: Firebase वरून holidays fetch कर
+        // आत्ता साठी empty return
+        return holidays;
+    }
+
+    // ================= GET WORKING DATES FOR MONTH =================
+    private Set<String> getWorkingDatesForMonth(String month, String weeklyHoliday, String employeeMobile) {
+        Set<String> workingDates = new HashSet<>();
+
+        String[] parts = month.split("-");
+        int monthNum = Integer.parseInt(parts[0]);
+        int year = Integer.parseInt(parts[1]);
+
+        Calendar cal = Calendar.getInstance();
+        cal.set(year, monthNum - 1, 1);
+        int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+
+        Set<Integer> weeklyOffDays = parseWeeklyHoliday(weeklyHoliday);
+        Set<String> companyHolidays = fetchCompanyHolidaysForMonth(month);
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+        for (int day = 1; day <= daysInMonth; day++) {
+            cal.set(year, monthNum - 1, day);
+            int dayOfWeek = cal.get(Calendar.DAY_OF_WEEK);
+            String dateStr = String.format("%04d-%02d-%02d", year, monthNum, day);
+
+            // Skip weekly off
+            if (weeklyOffDays.contains(dayOfWeek)) {
+                continue;
+            }
+
+            // Skip company holiday
+            if (companyHolidays.contains(dateStr)) {
+                continue;
+            }
+
+            workingDates.add(dateStr);
+        }
+
+        return workingDates;
+    }
+
+    // ================= PROPORTIONAL ATTENDANCE SUMMARY (WITH HOLIDAYS) =================
+    private void buildMonthlyAttendanceSummaryProportional(
+            String month,
+            String employeeMobile,
+            SalaryConfig config,
+            AttendanceCallback callback
+    ) {
+        // ✅ First fetch employee's weekly holiday
+        fetchEmployeeWeeklyHoliday(employeeMobile, new HolidayCallback() {
+            @Override
+            public void onSuccess(String weeklyHoliday) {
+                MonthlyAttendanceSummary summary = new MonthlyAttendanceSummary();
+
+                // ✅ नवीन: Total days in month set कर
+                int totalDaysInMonth = getTotalDaysInMonth(month);
+                summary.totalDaysInMonth = totalDaysInMonth;
+
+                // Working days calculate कर (Sundays & holidays वगळून)
+                int workingDaysInMonth = calculateWorkingDaysForMonth(month, weeklyHoliday, employeeMobile);
+                summary.workingDaysInMonth = workingDaysInMonth;
+
+                Log.d("SALARY_DEBUG", "Month: " + month);
+                Log.d("SALARY_DEBUG", "Total days in month: " + totalDaysInMonth);
+                Log.d("SALARY_DEBUG", "Working days: " + workingDaysInMonth);
+
+                // Fetch attendance
+                fetchAttendanceForMonth(month, employeeMobile, weeklyHoliday, summary, config, callback);
+            }
+
+            @Override
+            public void onError() {
+                // Error झाल्यास default "Sunday" वापर
+                MonthlyAttendanceSummary summary = new MonthlyAttendanceSummary();
+                int totalDaysInMonth = getTotalDaysInMonth(month);
+                summary.totalDaysInMonth = totalDaysInMonth;
+                int workingDaysInMonth = calculateWorkingDaysForMonth(month, "Sunday", employeeMobile);
+                summary.workingDaysInMonth = workingDaysInMonth;
+                fetchAttendanceForMonth(month, employeeMobile, "Sunday", summary, config, callback);
+            }
+        });
+    }
+
+    private void fetchAttendanceForMonth(
+            String month,
+            String employeeMobile,
+            String weeklyHoliday,
+            MonthlyAttendanceSummary summary,
+            SalaryConfig config,
+            AttendanceCallback callback
+    ) {
+        Set<String> workingDates = getWorkingDatesForMonth(month, weeklyHoliday, employeeMobile);
+
+        companyRef.child("attendance").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot attendanceSnap) {
+
+                // Track which working dates have attendance
+                Set<String> attendedDates = new HashSet<>();
+
+                for (DataSnapshot dateSnap : attendanceSnap.getChildren()) {
+                    String dateKey = dateSnap.getKey();
+                    if (dateKey == null) continue;
+
+                    // Check if this date belongs to selected month
+                    String recordMonth = dateKey.substring(5, 7) + "-" + dateKey.substring(0, 4);
+                    if (!recordMonth.equals(month)) continue;
+
+                    // Check if this is a working day
+                    if (!workingDates.contains(dateKey)) continue;
+
+                    DataSnapshot empSnap = dateSnap.child(employeeMobile);
+                    if (!empSnap.exists()) {
+                        continue;
+                    }
+
+                    String finalStatus = empSnap.child("finalStatus").getValue(String.class);
+
+                    if (finalStatus == null) {
+                        continue;
+                    }
+
+                    attendedDates.add(dateKey);
+                    finalStatus = finalStatus.toLowerCase();
+
+                    if (finalStatus.contains("present")) {
+                        summary.presentDays++;
+                    } else if (finalStatus.contains("half")) {
+                        summary.halfDays++;
+                    } else if (finalStatus.contains("absent")) {
+                        summary.absentDays++;
+                    }
+                }
+
+                // Check for working days with no attendance (absent)
+                for (String workingDate : workingDates) {
+
+                    if (!attendedDates.contains(workingDate)) {
+
+                        summary.absentDays++;
+
+                    }
+
+                }
+
+                // Now count leaves
+                countLeavesProportional(month, employeeMobile, config, summary, callback);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                callback.onError(error.getMessage());
+            }
+        });
+    }
+
+    private void countLeavesProportional(
+            String month,
+            String employeeMobile,
+            SalaryConfig config,
+            MonthlyAttendanceSummary summary,
+            AttendanceCallback callback
+    ) {
+        companyRef.child("leaves").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                int paidLimit = config.paidLeaves;
+                int paidUsed = 0;
+
+                for (DataSnapshot l : snapshot.getChildren()) {
+                    if (!employeeMobile.equals(l.child("employeeMobile").getValue(String.class)))
+                        continue;
+
+                    if (!"APPROVED".equals(l.child("status").getValue(String.class)))
+                        continue;
+
+                    boolean isPaid = Boolean.TRUE.equals(l.child("isPaid").getValue(Boolean.class));
+
+                    int days = countDaysInMonth(
+                            l.child("fromDate").getValue(String.class),
+                            l.child("toDate").getValue(String.class),
+                            month
+                    );
+
+                    Log.d("LEAVE_DEBUG",
+                            "Employee=" + employeeMobile +
+                                    " From=" + l.child("fromDate").getValue(String.class) +
+                                    " To=" + l.child("toDate").getValue(String.class) +
+                                    " Days=" + days);
+
+                    if (isPaid && paidUsed < paidLimit) {
+                        int allowed = Math.min(days, paidLimit - paidUsed);
+                        summary.paidLeavesUsed += allowed;
+                        paidUsed += allowed;
+                        summary.unpaidLeaves += (days - allowed);
+                    } else {
+                        summary.unpaidLeaves += days;
+                    }
+                }
+                Log.d("SALARY_FINAL",
+                        "Present = " + summary.presentDays);
+
+                Log.d("SALARY_FINAL",
+                        "Absent = " + summary.absentDays);
+
+                Log.d("SALARY_FINAL",
+                        "Working Days = " + summary.workingDaysInMonth);
+                callback.onReady(summary);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                callback.onError(error.getMessage());
+            }
+        });
+    }
+    private Set<Integer> parseWeeklyHoliday(String holiday) {
+        Set<Integer> days = new HashSet<>();
+        if (holiday == null || holiday.equals("None") || holiday.isEmpty()) {
+            return days;  // No weekly off
+        }
+
+        if (holiday.contains("&")) {
+            // "Saturday & Sunday" case
+            if (holiday.contains("Saturday")) days.add(Calendar.SATURDAY);
+            if (holiday.contains("Sunday")) days.add(Calendar.SUNDAY);
+        } else {
+            // Single day: "Sunday", "Monday", etc.
+            switch (holiday.trim()) {
+                case "Sunday": days.add(Calendar.SUNDAY); break;
+                case "Monday": days.add(Calendar.MONDAY); break;
+                case "Tuesday": days.add(Calendar.TUESDAY); break;
+                case "Wednesday": days.add(Calendar.WEDNESDAY); break;
+                case "Thursday": days.add(Calendar.THURSDAY); break;
+                case "Friday": days.add(Calendar.FRIDAY); break;
+                case "Saturday": days.add(Calendar.SATURDAY); break;
+            }
+        }
+        return days;
+    }
     // ================= TOOLBAR SETUP WITH BACK ARROW =================
     private void setupToolbar() {
         setSupportActionBar(toolbar);
@@ -165,11 +475,7 @@ public class GenerateSalaryActivity extends AppCompatActivity {
     }
 
     // ================= FETCH CONFIG + ATTENDANCE =================
-    private void fetchSalaryConfigAndAttendance(
-            String month,
-            String employeeMobile
-    ) {
-        // Show loading
+    private void fetchSalaryConfigAndAttendance(String month, String employeeMobile) {
         btnGenerate.setEnabled(false);
         btnGenerate.setText("Processing...");
 
@@ -179,7 +485,6 @@ public class GenerateSalaryActivity extends AppCompatActivity {
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot snapshot) {
-
                         if (!snapshot.exists()) {
                             Toast.makeText(GenerateSalaryActivity.this,
                                     "Salary config not set for this employee",
@@ -190,7 +495,7 @@ public class GenerateSalaryActivity extends AppCompatActivity {
 
                         SalaryConfig config = parseSalaryConfig(snapshot);
 
-                        if (config.monthlySalary <= 0 || config.workingDays <= 0) {
+                        if (config.monthlySalary <= 0) {
                             Toast.makeText(GenerateSalaryActivity.this,
                                     "Invalid salary configuration",
                                     Toast.LENGTH_LONG).show();
@@ -198,26 +503,21 @@ public class GenerateSalaryActivity extends AppCompatActivity {
                             return;
                         }
 
-                        buildMonthlyAttendanceSummary(
+                        // ✅ नवीन proportional method call कर
+                        buildMonthlyAttendanceSummaryProportional(
                                 month,
                                 employeeMobile,
                                 config,
                                 new AttendanceCallback() {
                                     @Override
                                     public void onReady(MonthlyAttendanceSummary summary) {
-                                        generateAndSaveSalary(
-                                                month,
-                                                employeeMobile,
-                                                summary,
-                                                config
-                                        );
+                                        generateAndSaveSalary(month, employeeMobile, summary, config);
                                     }
 
                                     @Override
                                     public void onError(String error) {
                                         Toast.makeText(GenerateSalaryActivity.this,
-                                                error,
-                                                Toast.LENGTH_LONG).show();
+                                                error, Toast.LENGTH_LONG).show();
                                         resetGenerateButton();
                                     }
                                 }
@@ -227,8 +527,7 @@ public class GenerateSalaryActivity extends AppCompatActivity {
                     @Override
                     public void onCancelled(@NonNull DatabaseError error) {
                         Toast.makeText(GenerateSalaryActivity.this,
-                                "Failed to fetch salary config",
-                                Toast.LENGTH_SHORT).show();
+                                "Failed to fetch salary config", Toast.LENGTH_SHORT).show();
                         resetGenerateButton();
                     }
                 });
@@ -295,20 +594,69 @@ public class GenerateSalaryActivity extends AppCompatActivity {
                     }
                 });
     }
+    // ================= TOTAL DAYS IN MONTH =================
+    private int getTotalDaysInMonth(String month) {
+        String[] parts = month.split("-");
+        int monthNum = Integer.parseInt(parts[0]);
+        int year = Integer.parseInt(parts[1]);
 
+        Calendar cal = Calendar.getInstance();
+        cal.set(year, monthNum - 1, 1);
+        return cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+    }
     private int countDaysInMonth(
             String fromDate,
             String toDate,
             String month
     ) {
-        if (fromDate == null || toDate == null) return 0;
+        if (fromDate == null || toDate == null)
+            return 0;
 
-        String fromMonth =
-                fromDate.substring(5, 7) + "-" + fromDate.substring(0, 4);
+        try {
 
-        if (!fromMonth.equals(month)) return 0;
+            java.text.SimpleDateFormat sdf =
+                    new java.text.SimpleDateFormat(
+                            "yyyy-MM-dd",
+                            java.util.Locale.getDefault());
 
-        return 1; // OK for single-day leave
+            java.util.Date start =
+                    sdf.parse(fromDate);
+
+            java.util.Date end =
+                    sdf.parse(toDate);
+
+            java.util.Calendar cal =
+                    java.util.Calendar.getInstance();
+
+            cal.setTime(start);
+
+            int count = 0;
+
+            while (!cal.getTime().after(end)) {
+
+                String current =
+                        sdf.format(cal.getTime());
+
+                String currentMonth =
+                        current.substring(5, 7)
+                                + "-"
+                                + current.substring(0, 4);
+
+                if (currentMonth.equals(month)) {
+                    count++;
+                }
+
+                cal.add(
+                        java.util.Calendar.DAY_OF_MONTH,
+                        1
+                );
+            }
+
+            return count;
+
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private void countLeaves(
@@ -461,7 +809,11 @@ public class GenerateSalaryActivity extends AppCompatActivity {
 
         void onError(String error);
     }
-
+    // ✅ ही नवीन interface add कर
+    private interface HolidayCallback {
+        void onSuccess(String weeklyHoliday);
+        void onError();
+    }
     @Override
     public boolean onSupportNavigateUp() {
         onBackPressed();

@@ -109,6 +109,8 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
 
     // UI Elements
     // Add this with your other location variables
+    private ValueEventListener subscriptionListener;
+    private DatabaseReference subscriptionRef;
 
     private float currentAccuracy = 0.0f;
     private Handler trackingHandler;
@@ -214,6 +216,8 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
         loadTodayAttendance();
         startClock();
         updateGreeting();
+        observeCompanySubscription();
+
 
         // ===== FIXED: Initialize SwipeRefreshLayout FIRST =====
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
@@ -572,7 +576,57 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
         shiftsRef = db.getReference("Companies").child(companyKey).child("shifts");
         attendancePhotoRef = FirebaseStorage.getInstance()
                 .getReference().child("Companies").child(companyKey).child("attendance_photos");
+
+        subscriptionRef = FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("subscription");
+
     }
+    private void observeCompanySubscription() {
+
+        subscriptionListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+
+                if (!snapshot.exists()) {
+                    forceLogout("❌ Company subscription not active");
+                    return;
+                }
+
+                String status = snapshot.child("status").getValue(String.class);
+                Long endDateMillisObj = snapshot.child("endDateMillis").getValue(Long.class);
+                long endDateMillis = endDateMillisObj != null ? endDateMillisObj : 0;
+
+                boolean isActive =
+                        "ACTIVE".equals(status) &&
+                                (endDateMillis == -1 || System.currentTimeMillis() <= endDateMillis);
+
+                if (!isActive) {
+                    forceLogout("❌ Company subscription expired");
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                forceLogout("❌ Unable to verify company subscription");
+            }
+        };
+
+        subscriptionRef.addValueEventListener(subscriptionListener);
+    }
+
+    private void forceLogout(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+
+        new PrefManager(this).logout();
+
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
 
     private void loadGeoFencingConfig() {
         GeoFencingHelper.fetchGeoFencingConfig(companyKey,
@@ -2948,11 +3002,19 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        if (subscriptionRef != null && subscriptionListener != null) {
+            subscriptionRef.removeEventListener(subscriptionListener);
+        }
+
         if (timeHandler != null) timeHandler.removeCallbacks(timeRunnable);
         stopWorkTimer();
-        stopLocationTracking(); // ADD THIS LINE
+        stopLocationTracking();
+
         if (fusedLocationClient != null && locationCallback != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
         }
     }
+
 }
+

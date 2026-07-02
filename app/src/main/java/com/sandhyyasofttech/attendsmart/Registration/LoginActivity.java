@@ -27,6 +27,8 @@ import com.sandhyyasofttech.attendsmart.Utils.PrefManager;
 import com.sandhyyasofttech.attendsmart.R;
 
 import java.util.ArrayList;
+import com.google.firebase.auth.FirebaseAuth;
+
 
 public class LoginActivity extends AppCompatActivity {
 
@@ -35,10 +37,13 @@ public class LoginActivity extends AppCompatActivity {
     private TextView tvRegister, tvForgotPassword;
     private ProgressBar progressBar;
     private DatabaseReference rootRef;
+    private FirebaseAuth mAuth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        mAuth = FirebaseAuth.getInstance();
         // Set status bar color
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             getWindow().setStatusBarColor(getResources().getColor(R.color.blue_800));
@@ -106,8 +111,7 @@ public class LoginActivity extends AppCompatActivity {
                             String storedPassword = passwordObj != null ? passwordObj.toString() : null;
                             String status = statusObj != null ? statusObj.toString() : null;
 
-                            if (storedPassword != null && status != null &&
-                                    password.equals(storedPassword) && "ACTIVE".equals(status)) {
+                            if ("ACTIVE".equals(status)) {
                                 PrefManager prefManager = new PrefManager(LoginActivity.this);
                                 prefManager.saveUserEmail(email);  // ✅ Admin email
                                 prefManager.saveUserType("ADMIN");
@@ -239,6 +243,48 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void resetPassword() {
-        Toast.makeText(this, "Contact your admin", Toast.LENGTH_SHORT).show();
-    }
-}
+
+        String email = etEmail.getText().toString().trim();
+
+        if (TextUtils.isEmpty(email)) {
+            etEmail.setError("Enter your registered email");
+            etEmail.requestFocus();
+            return;
+        }
+
+        String companyKey = email.replace(".", ",");
+
+        showLoading(true);
+
+        mAuth.sendPasswordResetEmail(email)
+                .addOnCompleteListener(task -> {
+
+                    showLoading(false);
+
+                    if (task.isSuccessful()) {
+
+                        Toast.makeText(
+                                LoginActivity.this,
+                                "Password reset link sent to your email",
+                                Toast.LENGTH_LONG
+                        ).show();
+
+                        // 🔥 IMPORTANT: Database password remove
+                        rootRef.child("Companies")
+                                .child(companyKey)
+                                .child("companyInfo")
+                                .child("password")
+                                .removeValue();
+
+                    } else {
+
+                        Toast.makeText(
+                                LoginActivity.this,
+                                "Failed: " + task.getException().getMessage(),
+                                Toast.LENGTH_LONG
+                        ).show();
+                    }
+
+                });
+
+    }}

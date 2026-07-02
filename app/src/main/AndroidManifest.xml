@@ -35,19 +35,22 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <activity
+            android:name=".Activities.AdminClaimDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".Activities.AdminClaimListActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".Activities.EmployeeClaimListActivity"
             android:exported="false" />
         <activity
             android:name=".Activities.EmployeeClaimActivity"
             android:exported="false" />
         <!-- Add these activities inside <application> tag -->
-        <activity
-            android:name=".Activities.AdminClaimListActivity"
-            android:parentActivityName=".Settings.SettingsActivity" />
 
-        <activity
-            android:name=".Activities.AdminClaimDetailActivity"
-            android:parentActivityName=".Activities.AdminClaimListActivity" />
+
+
 
 
 

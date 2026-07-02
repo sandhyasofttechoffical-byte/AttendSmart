@@ -100,10 +100,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Reject"
-                app:strokeColor="#F44336"
+                app:strokeColor="#9D3630"
                 app:strokeWidth="1dp"
                 android:textColor="#F44336"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="15dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnApprove"
@@ -112,7 +112,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="Approve"
-                app:cornerRadius="8dp"
+                app:cornerRadius="15dp"
                 android:backgroundTint="#4CAF50" />
 
         </LinearLayout>

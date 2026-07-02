@@ -24,9 +24,12 @@ import com.sandhyyasofttech.attendsmart.Models.LeaveModel;
 import com.sandhyyasofttech.attendsmart.R;
 import com.sandhyyasofttech.attendsmart.Utils.PrefManager;
 
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH> {
@@ -167,7 +170,7 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
                                     cal.get(Calendar.YEAR) == now.get(Calendar.YEAR);
 
                     if (sameMonth) {
-                        usedPaidLeaves += "HALF_DAY".equals(lm.leaveType) ? 0.5 : 1.0;
+                        usedPaidLeaves += calculateLeaveDays(lm);
                     }
                 }
 
@@ -186,8 +189,8 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
         double remaining = allowed - used;
 
         // ✅ Calculate days for current leave
-        double currentLeaveDays = "HALF_DAY".equals(m.leaveType) ? 0.5 : 1.0;
-
+        double currentLeaveDays =
+                calculateLeaveDays(m);
         String msg = "📊 Leave Balance Information\n\n" +
                 "Paid Leaves Allowed: " + allowed + "\n" +
                 "Already Used: " + used + "\n" +
@@ -214,6 +217,35 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
                 .show();
     }
 
+
+
+    private double calculateLeaveDays(LeaveModel m) {
+
+        if ("HALF_DAY".equals(m.leaveType)) {
+            return 0.5;
+        }
+
+        try {
+
+            SimpleDateFormat sdf =
+                    new SimpleDateFormat(
+                            "yyyy-MM-dd",
+                            Locale.getDefault()
+                    );
+
+            Date from = sdf.parse(m.fromDate);
+            Date to = sdf.parse(m.toDate);
+
+            long diff =
+                    to.getTime() - from.getTime();
+
+            return (diff / (1000 * 60 * 60 * 24)) + 1;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 1;
+        }
+    }
     // ✅ APPROVE LEAVE
     private void approveLeave(LeaveModel m, boolean isPaid) {
         Map<String, Object> map = new HashMap<>();

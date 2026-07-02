@@ -1,14 +1,13 @@
 package com.sandhyyasofttech.attendsmart.Registration;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,11 +17,9 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.animation.ValueAnimator;
-import android.view.animation.DecelerateInterpolator;
-import android.view.animation.RotateAnimation;
-import android.view.animation.Animation;
+
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -30,17 +27,13 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.github.mikephil.charting.charts.BarChart;
-import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.data.PieData;
-import com.github.mikephil.charting.data.PieDataSet;
-import com.github.mikephil.charting.data.PieEntry;
 import com.github.mikephil.charting.formatter.ValueFormatter;
-import com.github.mikephil.charting.utils.ColorTemplate;
+
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -57,6 +50,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.sandhyyasofttech.attendsmart.Activities.AdminDocumentsDashboardActivity;
 import com.sandhyyasofttech.attendsmart.Activities.AdminLeaveListActivity;
 import com.sandhyyasofttech.attendsmart.Activities.AdminTodayWorkActivity;
 import com.sandhyyasofttech.attendsmart.Activities.AllAttendanceActivity;
@@ -66,21 +60,26 @@ import com.sandhyyasofttech.attendsmart.Activities.GenerateSalaryActivity;
 import com.sandhyyasofttech.attendsmart.Activities.ProfileActivity;
 import com.sandhyyasofttech.attendsmart.Activities.ReportsActivity;
 import com.sandhyyasofttech.attendsmart.Activities.SalaryListActivity;
+import com.sandhyyasofttech.attendsmart.Models.GeoFencingConfig;
+import com.sandhyyasofttech.attendsmart.Settings.GeoFencingSettingsActivity;
+import com.sandhyyasofttech.attendsmart.Settings.SettingsActivity;
 import com.sandhyyasofttech.attendsmart.Activities.ShiftActivity;
 import com.sandhyyasofttech.attendsmart.Adapters.EmployeeAdapter;
 import com.sandhyyasofttech.attendsmart.Admin.AddEmployeeActivity;
 import com.sandhyyasofttech.attendsmart.Models.EmployeeModel;
-import com.sandhyyasofttech.attendsmart.Models.GeoFencingConfig;
 import com.sandhyyasofttech.attendsmart.R;
-import com.sandhyyasofttech.attendsmart.Settings.SettingsActivity;
+import com.sandhyyasofttech.attendsmart.Subscription.SubscriptionSelectActivity;
+import com.sandhyyasofttech.attendsmart.Utils.GeoFencingHelper;
 import com.sandhyyasofttech.attendsmart.Utils.PrefManager;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import com.bumptech.glide.Glide;
 
@@ -99,9 +98,6 @@ public class AdminDashboardActivity extends AppCompatActivity {
     private ExtendedFloatingActionButton fabAddEmployee;
     private Menu navMenu;
     private MenuItem navLeavesItem;
-
-    // Donut Charts
-    private PieChart donutTotal, donutPresent, donutAbsent, donutLate;
 
     // New UI Components
     private ImageView btnMenu, btnSettings, btnNotifications;
@@ -130,14 +126,12 @@ public class AdminDashboardActivity extends AppCompatActivity {
     private String employeeMobile = "";
     private double currentLat = 0;
     private double currentLng = 0;
-    private ValueAnimator totalAnimator, presentAnimator, absentAnimator, lateAnimator;
 
     private Handler timeHandler;
     private Runnable timeRunnable;
 
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -168,17 +162,14 @@ public class AdminDashboardActivity extends AppCompatActivity {
         requestNotificationPermission();
         setupRealTimeLeaveListener();
 
-        setupDonutCharts();
         fetchAllData();
 
         setupWeeklyChart();
         fetchWeeklyData();
         fetchPendingNotifications();
         checkLeaveRequestsForBadge();
-
-        // Add this line to animate charts on open
-        animateAllChartsOnOpen();
     }
+
     private String getTodayDate() {
         return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
     }
@@ -428,12 +419,6 @@ public class AdminDashboardActivity extends AppCompatActivity {
         tvOnTimePercent = findViewById(R.id.tvOnTimePercent);
         weeklyChart = findViewById(R.id.weeklyChart);
 
-        // Initialize donut charts
-        donutTotal = findViewById(R.id.donutTotal);
-        donutPresent = findViewById(R.id.donutPresent);
-        donutAbsent = findViewById(R.id.donutAbsent);
-        donutLate = findViewById(R.id.donutLate);
-
         etSearch = findViewById(R.id.etSearch);
 
         rvEmployees = findViewById(R.id.rvEmployees);
@@ -446,143 +431,6 @@ public class AdminDashboardActivity extends AppCompatActivity {
         rvEmployees.setAdapter(adapter);
 
         fabAddEmployee = findViewById(R.id.fabAddEmployee);
-    }
-
-    private void setupDonutCharts() {
-        setupDonutChart(donutTotal);
-        setupDonutChart(donutPresent);
-        setupDonutChart(donutAbsent);
-        setupDonutChart(donutLate);
-    }
-    // Updated setupDonutChart method with compact percentage
-    private void setupDonutChart(PieChart donutChart) {
-        donutChart.setUsePercentValues(false);
-        donutChart.getDescription().setEnabled(false);
-        donutChart.setDrawHoleEnabled(true);
-        donutChart.setHoleColor(Color.TRANSPARENT);
-        donutChart.setTransparentCircleColor(Color.WHITE);
-        donutChart.setTransparentCircleAlpha(110);
-        donutChart.setHoleRadius(70f); // Increased from 65f to make hole bigger
-        donutChart.setTransparentCircleRadius(75f);
-        donutChart.setDrawCenterText(true);
-        donutChart.setDrawEntryLabels(false);
-        donutChart.setTouchEnabled(false);
-        donutChart.setDragDecelerationFrictionCoef(0.95f);
-
-        // Compact center text styling
-        donutChart.setCenterTextSize(11f); // Reduced from 14f to 11f
-        donutChart.setCenterTextTypeface(Typeface.DEFAULT_BOLD);
-        donutChart.setCenterTextColor(Color.BLACK);
-
-        // Legend
-        donutChart.getLegend().setEnabled(false);
-
-        // Entry label styling
-        donutChart.setEntryLabelColor(Color.WHITE);
-        donutChart.setEntryLabelTextSize(0f);
-    }
-
-    // Updated animatePercentageText method with compact formatting
-    private void animatePercentageText(PieChart donutChart, int targetPercent) {
-        ValueAnimator percentAnimator = ValueAnimator.ofInt(0, targetPercent);
-        percentAnimator.setDuration(800); // Slightly faster animation
-        percentAnimator.setInterpolator(new DecelerateInterpolator());
-
-        percentAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                int currentPercent = (int) animation.getAnimatedValue();
-                // Compact format - just the number with % symbol
-                donutChart.setCenterText(currentPercent + "%");
-                donutChart.invalidate();
-            }
-        });
-
-        percentAnimator.start();
-    }
-
-    // Updated updateDonutChart method with adjusted parameters for compact donut
-    private void updateDonutChart(PieChart donutChart, int value, int total, int color) {
-        if (donutChart == null) return;
-
-        // Cancel any existing animation for this chart
-        if (donutChart == donutTotal && totalAnimator != null) totalAnimator.cancel();
-        if (donutChart == donutPresent && presentAnimator != null) presentAnimator.cancel();
-        if (donutChart == donutAbsent && absentAnimator != null) absentAnimator.cancel();
-        if (donutChart == donutLate && lateAnimator != null) lateAnimator.cancel();
-
-        float percentage = (total > 0) ? (value * 100f) / total : 0f;
-        int percentInt = Math.round(percentage);
-
-        // Animate the percentage text counting
-        animatePercentageText(donutChart, percentInt);
-
-        // Animate the chart rotation
-        animateChartRotation(donutChart);
-
-        // Create entries with animation
-        ValueAnimator animator = ValueAnimator.ofFloat(0f, percentage);
-        animator.setDuration(800); // Slightly faster animation
-        animator.setInterpolator(new DecelerateInterpolator());
-
-        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                float animatedPercentage = (float) animation.getAnimatedValue();
-                float remaining = 100f - animatedPercentage;
-                if (remaining < 0) remaining = 0;
-
-                ArrayList<PieEntry> entries = new ArrayList<>();
-                entries.add(new PieEntry(animatedPercentage, ""));
-                if (remaining > 0.1f) {
-                    entries.add(new PieEntry(remaining, ""));
-                }
-
-                PieDataSet dataSet = new PieDataSet(entries, "");
-
-                ArrayList<Integer> colors = new ArrayList<>();
-                colors.add(color);
-                if (remaining > 0.1f) {
-                    colors.add(Color.parseColor("#E0E0E0"));
-                }
-
-                dataSet.setColors(colors);
-                dataSet.setSliceSpace(0f);
-                dataSet.setSelectionShift(0f);
-                dataSet.setDrawValues(false); // Don't draw values on slices
-
-                PieData data = new PieData(dataSet);
-                donutChart.setData(data);
-                donutChart.invalidate();
-            }
-        });
-
-        // Store animator reference
-        if (donutChart == donutTotal) {
-            totalAnimator = animator;
-        } else if (donutChart == donutPresent) {
-            presentAnimator = animator;
-        } else if (donutChart == donutAbsent) {
-            absentAnimator = animator;
-        } else if (donutChart == donutLate) {
-            lateAnimator = animator;
-        }
-
-        animator.start();
-    }
-
-    // Simplified rotation animation (shorter duration)
-    private void animateChartRotation(PieChart donutChart) {
-        RotateAnimation rotate = new RotateAnimation(
-                0f, 360f,
-                Animation.RELATIVE_TO_SELF, 0.5f,
-                Animation.RELATIVE_TO_SELF, 0.5f
-        );
-        rotate.setDuration(600); // Reduced from 800ms to 600ms
-        rotate.setInterpolator(new DecelerateInterpolator());
-        rotate.setFillAfter(true);
-
-        donutChart.startAnimation(rotate);
     }
 
     private void setupWeeklyChart() {
@@ -1109,7 +957,6 @@ public class AdminDashboardActivity extends AppCompatActivity {
             });
         }
     }
-
     private void showQuickActionsDialog() {
         String[] actions = {
                 "Add Employee",
@@ -1153,7 +1000,6 @@ public class AdminDashboardActivity extends AppCompatActivity {
                 });
         builder.create().show();
     }
-
     private void saveAdminFcmToken() {
         FirebaseMessaging.getInstance().getToken()
                 .addOnSuccessListener(token -> {
@@ -1204,6 +1050,13 @@ public class AdminDashboardActivity extends AppCompatActivity {
         }
     }
 
+// ========================================
+// UPDATED fetchEmployeeList() METHOD
+// This method now checks Firebase "finalStatus" field
+// If finalStatus = "Absent", employee is counted as absent
+// All other existing logic remains the same
+// ========================================
+
     private void fetchEmployeeList() {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         FirebaseDatabase.getInstance().getReference("Companies").child(companyKey)
@@ -1226,7 +1079,7 @@ public class AdminDashboardActivity extends AppCompatActivity {
                                         String phone = model.getEmployeeMobile();
                                         DataSnapshot attRecord = todayAttSnap.child(phone);
 
-                                        // Check finalStatus first
+                                        // ===== NEW: Check finalStatus first =====
                                         String finalStatus = safeToString(attRecord.child("finalStatus"));
 
                                         // If finalStatus is "Absent", mark as absent regardless of check-in
@@ -1241,7 +1094,7 @@ public class AdminDashboardActivity extends AppCompatActivity {
                                             continue; // Skip to next employee
                                         }
 
-                                        // Existing Logic for other cases
+                                        // ===== Existing Logic for other cases =====
                                         if (attRecord.exists() && attRecord.hasChild("checkInTime")) {
                                             String status = safeToString(attRecord.child("status"));
                                             String lateStatus = safeToString(attRecord.child("lateStatus"));
@@ -1292,7 +1145,6 @@ public class AdminDashboardActivity extends AppCompatActivity {
                     }
                 });
     }
-
     private EmployeeModel parseEmployeeSafely(DataSnapshot infoSnap) {
         try {
             EmployeeModel model = new EmployeeModel();
@@ -1320,6 +1172,13 @@ public class AdminDashboardActivity extends AppCompatActivity {
         return value.toString();
     }
 
+// ========================================
+// UPDATED fetchDashboardData() METHOD
+// This method now checks Firebase "finalStatus" field
+// If finalStatus = "Absent", it counts as absent
+// All other existing logic remains the same
+// ========================================
+
     private void fetchDashboardData() {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
 
@@ -1333,16 +1192,19 @@ public class AdminDashboardActivity extends AppCompatActivity {
                     public void onDataChange(@NonNull DataSnapshot attSnapshot) {
                         int presentCount = 0;
                         int lateCount = 0;
-                        int markedAbsentCount = 0;
+                        int markedAbsentCount = 0; // NEW: Count employees marked as absent in Firebase
 
                         for (DataSnapshot att : attSnapshot.getChildren()) {
+                            // ===== NEW: Check finalStatus first =====
                             String finalStatus = att.child("finalStatus").getValue(String.class);
 
+                            // If finalStatus is "Absent", count as absent
                             if ("Absent".equalsIgnoreCase(finalStatus)) {
                                 markedAbsentCount++;
-                                continue;
+                                continue; // Skip to next record
                             }
 
+                            // ===== Existing Logic =====
                             if (att.hasChild("checkInTime")) {
                                 presentCount++;
                                 String lateStatus = att.child("lateStatus").getValue(String.class);
@@ -1352,10 +1214,11 @@ public class AdminDashboardActivity extends AppCompatActivity {
                             }
                         }
 
+                        // Calculate absent: Total - Present + Marked Absent
+                        // Those who didn't check in + those marked absent in Firebase
                         int notCheckedIn = Math.max(0, totalEmployees - presentCount - markedAbsentCount);
                         int totalAbsent = notCheckedIn + markedAbsentCount;
 
-                        // Update UI
                         updateDashboardUI(totalEmployees, presentCount, totalAbsent, lateCount);
                     }
 
@@ -1368,41 +1231,13 @@ public class AdminDashboardActivity extends AppCompatActivity {
             public void onCancelled(@NonNull DatabaseError error) {}
         });
     }
-
-
-    // Updated updateDashboardUI method
     private void updateDashboardUI(int total, int present, int absent, int late) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                // Update text values
-                tvTotalEmployees.setText(String.valueOf(total));
-                tvPresent.setText(String.valueOf(present));
-                tvAbsent.setText(String.valueOf(absent));
-                tvLate.setText(String.valueOf(late));
-
-                // Update donut charts with animation
-                updateDonutChart(donutTotal, total, total, Color.parseColor("#3F51B5"));
-                updateDonutChart(donutPresent, present, total, Color.parseColor("#4CAF50"));
-                updateDonutChart(donutAbsent, absent, total, Color.parseColor("#F44336"));
-                updateDonutChart(donutLate, late, total, Color.parseColor("#FF9800"));
-            }
-        });
+        tvTotalEmployees.setText(String.valueOf(total));
+        tvPresent.setText(String.valueOf(present));
+        tvAbsent.setText(String.valueOf(absent));
+        tvLate.setText(String.valueOf(late));
     }
 
-    // Add this method to handle rotation on first load only
-    private void animateAllChartsOnOpen() {
-        // Add a small delay to ensure views are measured
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                animateChartRotation(donutTotal);
-                animateChartRotation(donutPresent);
-                animateChartRotation(donutAbsent);
-                animateChartRotation(donutLate);
-            }
-        }, 300);
-    }
     private void showLogoutConfirmation() {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Logout")
@@ -1428,6 +1263,8 @@ public class AdminDashboardActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        checkSubscriptionAndHandle(); // ⭐ IMPORTANT
+
         fetchAllData();
         fetchWeeklyData();
     }
@@ -1443,5 +1280,135 @@ public class AdminDashboardActivity extends AppCompatActivity {
         if (fusedLocationClient != null && locationCallback != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
         }
+    }
+    private void checkSubscriptionAndHandle() {
+
+        DatabaseReference subRef = FirebaseDatabase.getInstance()
+                .getReference("Companies")
+                .child(companyKey)
+                .child("subscription");
+
+        subRef.get().addOnSuccessListener(snapshot -> {
+
+            // CASE 1: No subscription
+            if (!snapshot.exists()) {
+                showSubscriptionPopup(
+                        "No Active Subscription",
+                        "Please select a subscription plan to continue using the app."
+                );
+                return;
+            }
+
+
+            String status =
+                    snapshot.child("status").getValue(String.class);
+
+            String paymentStatus =
+                    snapshot.child("paymentStatus").getValue(String.class);
+
+            Boolean isTrial =
+                    snapshot.child("isTrial").getValue(Boolean.class);
+
+            Long endDateMillisObj =
+                    snapshot.child("endDateMillis").getValue(Long.class);
+
+            long endDateMillis = endDateMillisObj != null ? endDateMillisObj : 0;
+
+            if (!isSubscriptionActive(
+                    endDateMillis,
+                    status,
+                    paymentStatus,
+                    isTrial != null && isTrial
+            )) {
+                showSubscriptionPopup(
+                        "Subscription Inactive",
+                        "Payment pending or subscription expired. Please renew."
+                );
+            }
+
+            if ("PENDING".equals(paymentStatus)) {
+                showPaymentPendingDialog();
+                return;
+            }
+/*
+ SUBSCRIPTION RULES:
+ ------------------
+ Trial:
+   status = ACTIVE
+   paymentStatus = FREE
+
+ Paid Plan:
+   status = ACTIVE
+   paymentStatus MUST be PAID
+
+ PENDING payment means:
+   - Subscription record exists
+   - App access BLOCKED
+*/
+
+
+            // CASE 3: Active → dashboard continues
+
+        }).addOnFailureListener(e ->
+                Toast.makeText(this,
+                        "Unable to verify subscription status",
+                        Toast.LENGTH_SHORT).show()
+        );
+    }
+
+    private void showSubscriptionPopup(String title, String message) {
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("Select Plan", (dialog, which) -> {
+                    Intent intent = new Intent(
+                            AdminDashboardActivity.this,
+                            SubscriptionSelectActivity.class
+                    );
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    startActivity(intent);
+                    finish();
+                })
+                .show();
+    }
+
+
+    private boolean isSubscriptionActive(
+            long endDateMillis,
+            String status,
+            String paymentStatus,
+            boolean isTrial
+    ) {
+        if (!"ACTIVE".equals(status)) return false;
+
+        if (isTrial && "FREE".equals(paymentStatus)) {
+            return System.currentTimeMillis() <= endDateMillis;
+        }
+
+        if (!"PAID".equals(paymentStatus)) return false;
+
+        return System.currentTimeMillis() <= endDateMillis;
+    }
+
+
+    private void showPaymentPendingDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Payment Pending ⏳")
+                .setMessage(
+                        "Your subscription is selected but payment is not confirmed.\n\n" +
+                                "Please contact admin to complete payment."
+                )
+                .setCancelable(false)
+                .setPositiveButton("OK", (d, w) -> {
+                    d.dismiss();
+                    startActivity(new Intent(
+                            this,
+                            SubscriptionSelectActivity.class
+                    ));
+                    finish();
+                })
+                .show();
     }
 }

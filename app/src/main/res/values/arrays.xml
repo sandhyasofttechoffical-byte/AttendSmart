@@ -17,6 +17,10 @@
         <item>Saturday</item>
     </string-array>
 
+    <string-array name="date_filter_options">
+        <item>Today</item>
+        <item>Select Date</item>
+    </string-array>
 
     <string-array name="gender_options">
         <item>Select Gender</item>

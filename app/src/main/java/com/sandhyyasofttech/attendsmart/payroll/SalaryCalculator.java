@@ -10,23 +10,33 @@ public class SalaryCalculator {
             MonthlyAttendanceSummary summary,
             SalaryConfig config
     ) {
-
         SalaryCalculationResult result = new SalaryCalculationResult();
 
-        // 🔐 SAFETY CHECK (NO NaN CRASH)
-        if (config.workingDays <= 0 || config.monthlySalary <= 0) {
+        // ✅ महिन्यातील एकूण दिवस वापर (30/31/28/29)
+        int totalDaysInMonth = summary.totalDaysInMonth;
+
+        // ✅ जर total days 0 असेल तर default 30 वापर
+        if (totalDaysInMonth <= 0) {
+            totalDaysInMonth = 30;
+        }
+
+        if (config.monthlySalary <= 0) {
             return result;
         }
 
-        double perDay = config.monthlySalary / config.workingDays;
+// ✅ Per day = Monthly Salary ÷ Configured Working Days
+        int workingDays = config.workingDays > 0
+                ? config.workingDays
+                : summary.workingDaysInMonth;
+
+        double perDay = config.monthlySalary / workingDays;
         result.perDaySalary = perDay;
 
-        double payableDays =
-                summary.presentDays +
-                        (summary.halfDays * 0.5) +
-                        summary.paidLeavesUsed;
-
+        // Payable days = present + (half * 0.5) + paid leaves
+        double payableDays = summary.presentDays + (summary.halfDays * 0.5) + summary.paidLeavesUsed;
         result.payableDays = payableDays;
+
+        // ✅ Gross = Payable days × Per day
         result.grossSalary = payableDays * perDay;
 
         double pf = 0, esi = 0, other = 0;
@@ -41,8 +51,12 @@ public class SalaryCalculator {
         result.esiAmount = esi;
         result.otherDeduction = other;
         result.totalDeduction = pf + esi + other;
-        result.netSalary = result.grossSalary - result.totalDeduction;
-
+        result.netSalary =
+                Math.max(
+                        0,
+                        result.grossSalary - result.totalDeduction
+                );
         return result;
     }
+
 }

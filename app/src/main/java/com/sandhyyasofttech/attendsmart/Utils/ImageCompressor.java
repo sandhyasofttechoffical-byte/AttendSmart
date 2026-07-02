@@ -30,7 +30,9 @@ public class ImageCompressor {
         int imageHeight = options.outHeight;
 
         int sampleSize = 1;
-        if (imageWidth > MAX_WIDTH || imageHeight > MAX_HEIGHT) {
+        if (imageWidth > MAX_WIDTH || imageHeight > MAX_HEIGHT)
+
+        {
             float widthRatio = (float) imageWidth / MAX_WIDTH;
             float heightRatio = (float) imageHeight / MAX_HEIGHT;
             sampleSize = (int) Math.min(widthRatio, heightRatio);

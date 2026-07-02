@@ -307,8 +307,14 @@ public class SalaryConfigActivity extends AppCompatActivity {
     }
 
     private String getStringValue(DataSnapshot snapshot, String key) {
-        String value = snapshot.child(key).getValue(String.class);
-        return value != null ? value : "";
+
+        Object value = snapshot.child(key).getValue();
+
+        if (value == null) {
+            return "";
+        }
+
+        return String.valueOf(value);
     }
 
     private void setDefaultValues() {
@@ -392,10 +398,43 @@ public class SalaryConfigActivity extends AppCompatActivity {
         btnSave.setText("Saving...");
 
         Map<String, Object> data = new HashMap<>();
-        data.put("monthlySalary", etMonthlySalary.getText().toString().trim());
-        data.put("workingDays", etWorkingDays.getText().toString().trim());
+        data.put(
+                "monthlySalary",
+                Double.parseDouble(
+                        etMonthlySalary
+                                .getText()
+                                .toString()
+                                .trim()
+                )
+        );
+
+        data.put(
+                "workingDays",
+                Integer.parseInt(
+                        etWorkingDays
+                                .getText()
+                                .toString()
+                                .trim()
+                )
+        );
+
+        data.put(
+                "paidLeaves",
+                etPaidLeaves
+                        .getText()
+                        .toString()
+                        .trim()
+                        .isEmpty()
+                        ? 0
+                        : Integer.parseInt(
+                        etPaidLeaves
+                                .getText()
+                                .toString()
+                                .trim()
+                )
+        );
         data.put("perDaySalary", etPerDaySalary.getText().toString().trim());
-        data.put("paidLeaves", etPaidLeaves.getText().toString().trim());
+//        data.put("paidLeaves", etPaidLeaves.getText().toString().trim());
         data.put("lateRule", spLateRule.getSelectedItem().toString());
         data.put("effectiveFrom", etEffectiveFrom.getText().toString().trim());
         data.put("bankName", etBankName.getText().toString().trim());
@@ -408,14 +447,29 @@ public class SalaryConfigActivity extends AppCompatActivity {
         data.put("deductionEnabled", deductionEnabled);
 
         if (deductionEnabled) {
-            data.put("pfPercent", etPfPercent.getText().toString().trim());
-            data.put("esiPercent", etEsiPercent.getText().toString().trim());
-            data.put("otherDeduction", etOtherDeduction.getText().toString().trim());
+            data.put("pfPercent",
+                    etPfPercent.getText().toString().trim().isEmpty()
+                            ? 0
+                            : Double.parseDouble(
+                            etPfPercent.getText().toString().trim()));
+
+            data.put("esiPercent",
+                    etEsiPercent.getText().toString().trim().isEmpty()
+                            ? 0
+                            : Double.parseDouble(
+                            etEsiPercent.getText().toString().trim()));
+
+            data.put("otherDeduction",
+                    etOtherDeduction.getText().toString().trim().isEmpty()
+                            ? 0
+                            : Double.parseDouble(
+                            etOtherDeduction.getText().toString().trim()));
+//            data.put("otherDeduction", etOtherDeduction.getText().toString().trim());
             data.put("deductionNote", etDeductionNote.getText().toString().trim());
         } else {
-            data.put("pfPercent", "");
-            data.put("esiPercent", "");
-            data.put("otherDeduction", "");
+            data.put("pfPercent", 0);
+            data.put("esiPercent", 0);
+            data.put("otherDeduction", 0);
             data.put("deductionNote", "");
         }
 

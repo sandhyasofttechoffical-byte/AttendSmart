@@ -35,25 +35,20 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <activity
+            android:name=".Activities.CompanyHolidayActivity"
+            android:exported="false" />
+        <activity
             android:name=".Activities.AdminClaimDetailActivity"
             android:exported="false" />
         <activity
             android:name=".Activities.AdminClaimListActivity"
             android:exported="false" />
-
         <activity
             android:name=".Activities.EmployeeClaimListActivity"
             android:exported="false" />
         <activity
             android:name=".Activities.EmployeeClaimActivity"
-            android:exported="false" />
-        <!-- Add these activities inside <application> tag -->
-
-
-
-
-
-
+            android:exported="false" /> <!-- Add these activities inside <application> tag -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="YOUR_GOOGLE_MAPS_API_KEY" />

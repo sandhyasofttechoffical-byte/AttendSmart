@@ -11,5 +11,6 @@ public class MonthlyAttendanceSummary implements Serializable {  // ✅ implemen
     public int unpaidLeaves = 0;
     public int workingDaysInMonth = 0;  // Dynamic per month
     public int totalDaysInMonth = 0;    // ✅ नवीन: एकूण महिन्यातील दिवस (30/31/28/29)
-
+    public int weeklyHolidayCount = 0;
+    public int companyHolidayCount = 0;
 }

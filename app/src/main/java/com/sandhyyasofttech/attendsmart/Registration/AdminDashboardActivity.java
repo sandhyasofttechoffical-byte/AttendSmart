@@ -54,6 +54,7 @@ import com.sandhyyasofttech.attendsmart.Activities.AdminDocumentsDashboardActivi
 import com.sandhyyasofttech.attendsmart.Activities.AdminLeaveListActivity;
 import com.sandhyyasofttech.attendsmart.Activities.AdminTodayWorkActivity;
 import com.sandhyyasofttech.attendsmart.Activities.AllAttendanceActivity;
+import com.sandhyyasofttech.attendsmart.Activities.CompanyHolidayActivity;
 import com.sandhyyasofttech.attendsmart.Activities.DepartmentActivity;
 import com.sandhyyasofttech.attendsmart.Activities.EmployeeListActivity;
 import com.sandhyyasofttech.attendsmart.Activities.GenerateSalaryActivity;
@@ -703,6 +704,8 @@ public class AdminDashboardActivity extends AppCompatActivity {
                 drawerLayout.closeDrawer(GravityCompat.START);
                 return true;
             }
+            else if (id == R.id.nav_company_holidays)
+                intent = new Intent(this, CompanyHolidayActivity.class);
 
             if (intent != null) startActivity(intent);
             drawerLayout.closeDrawer(GravityCompat.START);

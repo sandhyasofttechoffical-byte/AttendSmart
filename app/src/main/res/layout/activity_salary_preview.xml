@@ -207,6 +207,115 @@
 
                 </LinearLayout> <!-- Closing tag of inner LinearLayout -->
             </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/white"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:text="Attendance &amp; Payroll Details"
+                        android:textColor="#212121"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvWorkingDaysDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Payroll Base Days: 30"
+                        android:textColor="#424242" />
+
+                    <TextView
+                        android:id="@+id/tvPayableDaysDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Final Payable Days: 0"
+                        android:textColor="#424242"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvWeeklyHolidayDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Paid Weekly Holidays: 0"
+                        android:textColor="#424242" />
+
+                    <TextView
+                        android:id="@+id/tvCompanyHolidayDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Paid Company Holidays: 0"
+                        android:textColor="#424242" />
+
+                    <TextView
+                        android:id="@+id/tvPaidLeaveDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Paid Leaves: 0"
+                        android:textColor="#424242" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="10dp"
+                        android:background="#E0E0E0" />
+
+                    <TextView
+                        android:id="@+id/tvLateCountDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Total Late Marks: 0"
+                        android:textColor="#F57C00"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvLateRuleDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Late Rule: No deduction"
+                        android:textColor="#424242" />
+
+                    <TextView
+                        android:id="@+id/tvLateDeductionDaysDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Late Deduction Days: 0"
+                        android:textColor="#D32F2F" />
+
+                    <TextView
+                        android:id="@+id/tvLateDeductionAmountDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="5dp"
+                        android:text="Late Salary Impact: ₹0"
+                        android:textColor="#D32F2F"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Current Salary Display -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"

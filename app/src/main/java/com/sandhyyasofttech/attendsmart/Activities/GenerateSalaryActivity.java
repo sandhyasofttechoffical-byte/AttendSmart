@@ -337,6 +337,23 @@
                             continue;
                         }
 
+
+                        String lateStatus = empSnap.child("lateStatus").getValue(String.class);
+
+                        if (lateStatus != null
+                                && lateStatus.trim().toLowerCase(Locale.ROOT).contains("late")) {
+
+                            summary.lateCount++;
+
+                            Log.d(
+                                    "LATE_DEBUG",
+                                    "Date=" + dateKey +
+                                            ", Employee=" + employeeMobile +
+                                            ", LateStatus=" + lateStatus +
+                                            ", TotalLate=" + summary.lateCount
+                            );
+                        }
+
                         attendedDates.add(dateKey);
 
                         if ("Holiday".equalsIgnoreCase(finalStatus)) {

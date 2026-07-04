@@ -14,4 +14,8 @@ public class SalaryCalculationResult implements Serializable {  // ✅ implement
     public double totalDeduction;
 
     public double netSalary;
+
+    // Late deduction details
+    public double lateDeductionDays;
+    public double lateDeductionAmount;
 }

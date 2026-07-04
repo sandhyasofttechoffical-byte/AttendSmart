@@ -216,30 +216,44 @@ public class CompanyHolidayActivity extends AppCompatActivity {
 
         companyRef
                 .child("holidays")
-                .get()
-                .addOnSuccessListener(snapshot -> {
+                .addValueEventListener(
+                        new com.google.firebase.database.ValueEventListener() {
 
-                    holidayList.clear();
+                            @Override
+                            public void onDataChange(
+                                    @androidx.annotation.NonNull
+                                    com.google.firebase.database.DataSnapshot snapshot
+                            ) {
+                                holidayList.clear();
 
-                    for (com.google.firebase.database.DataSnapshot ds :
-                            snapshot.getChildren()) {
+                                for (com.google.firebase.database.DataSnapshot ds
+                                        : snapshot.getChildren()) {
 
-                        CompanyHolidayModel model =
-                                ds.getValue(CompanyHolidayModel.class);
+                                    CompanyHolidayModel model =
+                                            ds.getValue(
+                                                    CompanyHolidayModel.class
+                                            );
 
-                        if (model != null) {
+                                    if (model != null) {
+                                        model.holidayId = ds.getKey();
+                                        holidayList.add(model);
+                                    }
+                                }
 
-                            model.holidayId = ds.getKey();
+                                adapter.notifyDataSetChanged();
+                            }
 
-                            holidayList.add(model);
-
+                            @Override
+                            public void onCancelled(
+                                    @androidx.annotation.NonNull
+                                    com.google.firebase.database.DatabaseError error
+                            ) {
+                                android.widget.Toast.makeText(
+                                        CompanyHolidayActivity.this,
+                                        "Failed: " + error.getMessage(),
+                                        android.widget.Toast.LENGTH_LONG
+                                ).show();
+                            }
                         }
-
-                    }
-
-                    adapter.notifyDataSetChanged();
-
-                });
-
-    }
-}
+                );
+    }}

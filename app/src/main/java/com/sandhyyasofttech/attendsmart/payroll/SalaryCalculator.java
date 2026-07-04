@@ -42,6 +42,56 @@ public class SalaryCalculator {
                         + summary.weeklyHolidayCount
                         + summary.companyHolidayCount;
 
+
+// ================= LATE RULE =================
+
+        double lateDeductionDays = 0.0;
+
+        String lateRule = config.lateRule == null
+                ? ""
+                : config.lateRule.trim();
+
+        if ("3 Late marks = 0.5 Day deduction".equalsIgnoreCase(lateRule)) {
+
+            lateDeductionDays =
+                    (summary.lateCount / 3) * 0.5;
+
+        } else if ("5 Late marks = 1 Day deduction".equalsIgnoreCase(lateRule)) {
+
+            lateDeductionDays =
+                    (summary.lateCount / 5) * 1.0;
+        }
+
+
+// Late deduction apply
+        payableDays = payableDays - lateDeductionDays;
+
+        result.lateDeductionDays = lateDeductionDays;
+        result.lateDeductionAmount = lateDeductionDays * perDay;
+
+
+// Negative payable days nako
+        if (payableDays < 0) {
+            payableDays = 0;
+        }
+
+
+// Maximum configured working days
+        if (payableDays > workingDays) {
+            payableDays = workingDays;
+        }
+
+        result.payableDays = payableDays;
+
+
+        android.util.Log.d(
+                "SALARY_LATE_DEBUG",
+                "LateCount=" + summary.lateCount +
+                        ", LateRule=" + lateRule +
+                        ", LateDeductionDays=" + lateDeductionDays +
+                        ", FinalPayableDays=" + payableDays
+        );
+
 // Never pay more than configured working days
 //        if (payableDays > config.workingDays) {
 //            payableDays = config.workingDays;

@@ -49,6 +49,17 @@ public class SalaryPreviewActivity extends AppCompatActivity {
     private PrefManager pref;
     private String companyKey;
 
+    private TextView tvWorkingDaysDetail;
+    private TextView tvPayableDaysDetail;
+    private TextView tvWeeklyHolidayDetail;
+    private TextView tvCompanyHolidayDetail;
+    private TextView tvPaidLeaveDetail;
+
+    private TextView tvLateCountDetail;
+    private TextView tvLateRuleDetail;
+    private TextView tvLateDeductionDaysDetail;
+    private TextView tvLateDeductionAmountDetail;
+
     // ✅ Flag to prevent circular calculations
     private boolean isCalculating = false;
 
@@ -99,6 +110,17 @@ public class SalaryPreviewActivity extends AppCompatActivity {
         tvHalfDays = findViewById(R.id.tvHalfDays);
         tvLeaves = findViewById(R.id.tvLeaves);
         tvAbsentDays = findViewById(R.id.tvAbsentDays);
+
+        tvWorkingDaysDetail = findViewById(R.id.tvWorkingDaysDetail);
+        tvPayableDaysDetail = findViewById(R.id.tvPayableDaysDetail);
+        tvWeeklyHolidayDetail = findViewById(R.id.tvWeeklyHolidayDetail);
+        tvCompanyHolidayDetail = findViewById(R.id.tvCompanyHolidayDetail);
+        tvPaidLeaveDetail = findViewById(R.id.tvPaidLeaveDetail);
+
+        tvLateCountDetail = findViewById(R.id.tvLateCountDetail);
+        tvLateRuleDetail = findViewById(R.id.tvLateRuleDetail);
+        tvLateDeductionDaysDetail = findViewById(R.id.tvLateDeductionDaysDetail);
+        tvLateDeductionAmountDetail = findViewById(R.id.tvLateDeductionAmountDetail);
 
         // Salary display fields
         tvGrossSalary = findViewById(R.id.tvBasicSalary);
@@ -153,6 +175,64 @@ public class SalaryPreviewActivity extends AppCompatActivity {
         }
         // Salary Calculation (Original)
         SalaryCalculationResult result = previewData.calculationResult;
+
+        SalaryConfig config = previewData.salaryConfig;
+
+// Attendance + payroll details
+        tvWorkingDaysDetail.setText(
+                "Payroll Base Days: " +
+                        (config != null && config.workingDays > 0
+                                ? config.workingDays
+                                : 30)
+        );
+
+        tvPayableDaysDetail.setText(
+                "Final Payable Days: " +
+                        String.format(Locale.getDefault(), "%.1f", result.payableDays)
+        );
+
+        tvWeeklyHolidayDetail.setText(
+                "Paid Weekly Holidays: " +
+                        summary.weeklyHolidayCount
+        );
+
+        tvCompanyHolidayDetail.setText(
+                "Paid Company Holidays: " +
+                        summary.companyHolidayCount
+        );
+
+        tvPaidLeaveDetail.setText(
+                "Paid Leaves: " +
+                        summary.paidLeavesUsed
+        );
+
+        tvLateCountDetail.setText(
+                "Total Late Marks: " +
+                        summary.lateCount
+        );
+
+        String lateRule =
+                config != null && config.lateRule != null
+                        ? config.lateRule
+                        : "No deduction for late coming";
+
+        tvLateRuleDetail.setText(
+                "Late Rule: " + lateRule
+        );
+
+        tvLateDeductionDaysDetail.setText(
+                "Late Deduction Days: " +
+                        String.format(
+                                Locale.getDefault(),
+                                "%.1f",
+                                result.lateDeductionDays
+                        )
+        );
+
+        tvLateDeductionAmountDetail.setText(
+                "Late Salary Impact: " +
+                        formatter.format(result.lateDeductionAmount)
+        );
 
         // Display values
         tvGrossSalary.setText(formatter.format(result.grossSalary));

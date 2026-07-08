@@ -399,13 +399,23 @@ public class SalaryPreviewActivity extends AppCompatActivity {
         snapshot.salaryConfigSnapshot = previewData.salaryConfig;
 
         // Manual adjustments असल्यास calculation result update करा
-        SalaryCalculationResult finalResult = previewData.calculationResult;
-        finalResult.grossSalary = previewData.manualGrossSalary;
-        finalResult.pfAmount = previewData.manualPfAmount;
-        finalResult.esiAmount = previewData.manualEsiAmount;
-        finalResult.otherDeduction = previewData.manualOtherDeduction;
-        finalResult.totalDeduction = finalResult.pfAmount + finalResult.esiAmount + finalResult.otherDeduction;
-        finalResult.netSalary = previewData.manualNetSalary;
+        SalaryCalculationResult finalResult =
+                previewData.calculationResult;
+
+// Save exactly what is currently visible in Preview fields
+        double finalGross = getDoubleFromEditText(etManualGross);
+        double finalPf = getDoubleFromEditText(etManualPf);
+        double finalEsi = getDoubleFromEditText(etManualEsi);
+        double finalOther = getDoubleFromEditText(etManualOther);
+        double finalNet = getDoubleFromEditText(etManualNetSalary);
+
+        finalResult.grossSalary = finalGross;
+        finalResult.pfAmount = finalPf;
+        finalResult.esiAmount = finalEsi;
+        finalResult.otherDeduction = finalOther;
+        finalResult.totalDeduction =
+                finalPf + finalEsi + finalOther;
+        finalResult.netSalary = finalNet;
 
         snapshot.calculationResult = finalResult;
         snapshot.manualAdjustments = true;

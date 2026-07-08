@@ -433,7 +433,18 @@ public class SalaryConfigActivity extends AppCompatActivity {
                                 .trim()
                 )
         );
-        data.put("perDaySalary", etPerDaySalary.getText().toString().trim());
+        String perDayStr =
+                etPerDaySalary
+                        .getText()
+                        .toString()
+                        .trim();
+
+        data.put(
+                "perDaySalary",
+                perDayStr.isEmpty()
+                        ? 0.0
+                        : Double.parseDouble(perDayStr)
+        );
 //        data.put("paidLeaves", etPaidLeaves.getText().toString().trim());
         data.put("lateRule", spLateRule.getSelectedItem().toString());
         data.put("effectiveFrom", etEffectiveFrom.getText().toString().trim());

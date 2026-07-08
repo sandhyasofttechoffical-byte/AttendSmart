@@ -47,7 +47,7 @@
         private String companyKey;
         private DatabaseReference companyRef;
         private final ArrayList<String> employeeMobiles = new ArrayList<>();
-
+        private final ArrayList<String> employeeDisplayList = new ArrayList<>();
 
         @Override
 
@@ -533,41 +533,82 @@
     
         // ================= LOAD EMPLOYEES =================
         private void loadEmployees() {
+
             companyRef.child("employees")
                     .addListenerForSingleValueEvent(new ValueEventListener() {
+
                         @Override
                         public void onDataChange(@NonNull DataSnapshot snapshot) {
 
                             employeeMobiles.clear();
+                            employeeDisplayList.clear();
+
                             for (DataSnapshot s : snapshot.getChildren()) {
-                                employeeMobiles.add(s.getKey());
+
+                                String mobile = s.getKey();
+
+                                if (mobile == null || mobile.trim().isEmpty()) {
+                                    continue;
+                                }
+
+                                String employeeName = s
+                                        .child("info")
+                                        .child("employeeName")
+                                        .getValue(String.class);
+
+                                if (employeeName == null
+                                        || employeeName.trim().isEmpty()) {
+
+                                    employeeName = "Unknown Employee";
+                                }
+
+                                // Actual mobile separate save
+                                employeeMobiles.add(mobile);
+
+                                // Spinner display
+                                employeeDisplayList.add(
+                                        employeeName.trim() + " - " + mobile
+                                );
                             }
-    
+
                             if (employeeMobiles.isEmpty()) {
-                                Toast.makeText(GenerateSalaryActivity.this,
+
+                                Toast.makeText(
+                                        GenerateSalaryActivity.this,
                                         "No employees found",
-                                        Toast.LENGTH_SHORT).show();
+                                        Toast.LENGTH_SHORT
+                                ).show();
+
                                 return;
                             }
-    
+
                             ArrayAdapter<String> adapter =
-                                    new ArrayAdapter<>(GenerateSalaryActivity.this,
+                                    new ArrayAdapter<>(
+                                            GenerateSalaryActivity.this,
                                             android.R.layout.simple_spinner_item,
-                                            employeeMobiles);
+                                            employeeDisplayList
+                                    );
+
                             adapter.setDropDownViewResource(
-                                    android.R.layout.simple_spinner_dropdown_item);
+                                    android.R.layout.simple_spinner_dropdown_item
+                            );
+
                             spEmployee.setAdapter(adapter);
                         }
-    
+
                         @Override
                         public void onCancelled(@NonNull DatabaseError error) {
-                            Toast.makeText(GenerateSalaryActivity.this,
+
+                            Toast.makeText(
+                                    GenerateSalaryActivity.this,
                                     "Failed to load employees",
-                                    Toast.LENGTH_SHORT).show();
+                                    Toast.LENGTH_SHORT
+                            ).show();
                         }
                     });
         }
-    
+
+
         // ================= VALIDATE =================
         private void validateAndGenerate() {
             String month = etMonth.getText().toString().trim();
@@ -581,7 +622,24 @@
                 return;
             }
     
-            String employeeMobile = spEmployee.getSelectedItem().toString();
+//            String employeeMobile = spEmployee.getSelectedItem().toString();
+
+            int selectedPosition = spEmployee.getSelectedItemPosition();
+
+            if (selectedPosition < 0
+                    || selectedPosition >= employeeMobiles.size()) {
+
+                Toast.makeText(
+                        this,
+                        "Invalid employee selection",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                return;
+            }
+
+            String employeeMobile =
+                    employeeMobiles.get(selectedPosition);
             fetchSalaryConfigAndAttendance(month, employeeMobile);
         }
     

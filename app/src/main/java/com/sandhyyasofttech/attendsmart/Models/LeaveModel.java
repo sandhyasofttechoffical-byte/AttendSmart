@@ -34,8 +34,9 @@ public class LeaveModel {
     // Payment and days calculation
     public Boolean isPaid;         // true = paid leave, false = unpaid leave
     public Double totalDays;       // Total number of days
-    public Double paidDays;        // Number of paid days
-    public Double unpaidDays;      // Number of unpaid days
+    public double paidDays = 0;
+    public double unpaidDays = 0;
+    public double approvedDays = 0;
 
     // Default constructor (required for Firebase)
     public LeaveModel() {}

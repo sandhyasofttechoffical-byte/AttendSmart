@@ -669,6 +669,11 @@ public class SalaryDetailActivity extends AppCompatActivity {
     private String accountNumber = "";
     private String branchName = "";
     private String ifscCode = "";
+    private TextView tvWorkingDays;
+    private TextView tvPayableDays;
+
+    private int configuredWorkingDays = 30;
+    private double configuredPerDaySalary = 0.0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -693,7 +698,7 @@ public class SalaryDetailActivity extends AppCompatActivity {
         }
 
         PrefManager pref = new PrefManager(this);
-        companyKey = pref.getUserEmail().replace(".", ",");
+        companyKey = pref.getCompanyKey();
 
         fetchCompanyInfo();
         fetchEmployeeDetails();
@@ -730,7 +735,9 @@ public class SalaryDetailActivity extends AppCompatActivity {
 
                 // ---------- SALARY CONFIG (BANK DETAILS) ----------
                 DataSnapshot salarySnap = snapshot.child("salaryConfig");
+
                 if (salarySnap.exists()) {
+
                     bankName = salarySnap.child("bankName").getValue(String.class);
                     accountHolder = salarySnap.child("accountHolder").getValue(String.class);
                     accountNumber = salarySnap.child("accountNumber").getValue(String.class);
@@ -742,6 +749,92 @@ public class SalaryDetailActivity extends AppCompatActivity {
                     if (accountNumber == null) accountNumber = "";
                     if (branchName == null) branchName = "";
                     if (ifscCode == null) ifscCode = "";
+
+                    // =========================
+                    // CONFIGURED WORKING DAYS
+                    // =========================
+                    Object workingDaysValue =
+                            salarySnap.child("workingDays").getValue();
+
+                    configuredWorkingDays = 30;
+
+                    if (workingDaysValue instanceof Number) {
+
+                        configuredWorkingDays =
+                                ((Number) workingDaysValue).intValue();
+
+                    } else if (workingDaysValue instanceof String) {
+
+                        try {
+                            configuredWorkingDays =
+                                    Integer.parseInt(
+                                            ((String) workingDaysValue).trim()
+                                    );
+                        } catch (Exception ignored) {
+                            configuredWorkingDays = 30;
+                        }
+                    }
+
+                    if (configuredWorkingDays <= 0) {
+                        configuredWorkingDays = 30;
+                    }
+
+                    // =========================
+// CONFIGURED PER DAY SALARY
+// =========================
+                    Object perDaySalaryValue =
+                            salarySnap.child("perDaySalary").getValue();
+
+                    configuredPerDaySalary = 0.0;
+
+                    if (perDaySalaryValue instanceof Number) {
+
+                        configuredPerDaySalary =
+                                ((Number) perDaySalaryValue).doubleValue();
+
+                    } else if (perDaySalaryValue instanceof String) {
+
+                        try {
+                            configuredPerDaySalary =
+                                    Double.parseDouble(
+                                            ((String) perDaySalaryValue).trim()
+                                    );
+                        } catch (Exception ignored) {
+                            configuredPerDaySalary = 0.0;
+                        }
+                    }
+
+// fallback: monthlySalary / workingDays
+                    if (configuredPerDaySalary <= 0) {
+
+                        Object monthlySalaryValue =
+                                salarySnap.child("monthlySalary").getValue();
+
+                        double monthlySalary = 0.0;
+
+                        if (monthlySalaryValue instanceof Number) {
+
+                            monthlySalary =
+                                    ((Number) monthlySalaryValue).doubleValue();
+
+                        } else if (monthlySalaryValue instanceof String) {
+
+                            try {
+                                monthlySalary =
+                                        Double.parseDouble(
+                                                ((String) monthlySalaryValue).trim()
+                                        );
+                            } catch (Exception ignored) {
+                                monthlySalary = 0.0;
+                            }
+                        }
+
+                        if (monthlySalary > 0 && configuredWorkingDays > 0) {
+                            configuredPerDaySalary =
+                                    monthlySalary / configuredWorkingDays;
+                        }
+                    }
+
                 }
 
                 fetchSalaryDetails();
@@ -758,6 +851,10 @@ public class SalaryDetailActivity extends AppCompatActivity {
     }
 
     private void initializeViews() {
+
+        tvWorkingDays = findViewById(R.id.tvWorkingDays);
+        tvPayableDays = findViewById(R.id.tvPayableDays);
+
         btnBack = findViewById(R.id.btnBack);
 
         tvEmployeeName = findViewById(R.id.tvEmployeeName);
@@ -849,64 +946,199 @@ public class SalaryDetailActivity extends AppCompatActivity {
     }
 
     private void recalculateSalary() {
+
+        if (cachedSnapshot == null
+                || cachedSnapshot.calculationResult == null) {
+            return;
+        }
+
         try {
-            int present = parseIntValue(etPresent.getText().toString());
-            double halfDays = parseIntValue(etHalf.getText().toString()) * 0.5;
-            double perDay = parseDoubleValue(etPerDay.getText().toString());
-            double deductions = parseDoubleValue(etDeductions.getText().toString());
 
-            double workingDays = present + halfDays;
-            double gross = workingDays * perDay;
-            double net = gross - deductions;
+            double perDay =
+                    parseDoubleValue(
+                            etPerDay.getText().toString()
+                    );
 
-            NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("en", "IN"));
-            etGross.setText(formatter.format(gross));
-            etNet.setText(formatter.format(net));
+            double deductions =
+                    parseDoubleValue(
+                            etDeductions.getText().toString()
+                    );
+
+            // IMPORTANT:
+            // Present + Half वर salary calculate करू नका.
+            // Actual payroll engine ने calculate केलेले payableDays वापरा.
+            double payableDays =
+                    cachedSnapshot.calculationResult.payableDays;
+
+            double gross =
+                    payableDays * perDay;
+
+            double net =
+                    Math.max(0, gross - deductions);
+
+            NumberFormat formatter =
+                    NumberFormat.getCurrencyInstance(
+                            new Locale("en", "IN")
+                    );
+
+            etGross.setText(
+                    formatter.format(gross)
+            );
+
+            etNet.setText(
+                    formatter.format(net)
+            );
 
         } catch (Exception e) {
-            // Silent calculation error
+
+            android.util.Log.e(
+                    "SALARY_DETAIL",
+                    "Recalculation failed",
+                    e
+            );
         }
     }
 
+
     private void saveChanges() {
-        if (cachedSnapshot == null) return;
+
+        if (cachedSnapshot == null) {
+            Toast.makeText(
+                    this,
+                    "Salary data not loaded",
+                    Toast.LENGTH_SHORT
+            ).show();
+            return;
+        }
+
+        if (cachedSnapshot.attendanceSummary == null
+                || cachedSnapshot.calculationResult == null) {
+
+            Toast.makeText(
+                    this,
+                    "Invalid salary snapshot",
+                    Toast.LENGTH_SHORT
+            ).show();
+            return;
+        }
 
         try {
-            cachedSnapshot.attendanceSummary.presentDays = parseIntValue(etPresent.getText().toString());
-            cachedSnapshot.attendanceSummary.halfDays = parseIntValue(etHalf.getText().toString());
-            cachedSnapshot.attendanceSummary.absentDays = parseIntValue(etAbsent.getText().toString());
-            cachedSnapshot.attendanceSummary.lateCount = parseIntValue(etLate.getText().toString());
 
-            double perDay = parseDoubleValue(etPerDay.getText().toString());
-            double gross = parseDoubleValue(etGross.getText().toString());
-            double net = parseDoubleValue(etNet.getText().toString());
-            double deductions = parseDoubleValue(etDeductions.getText().toString());
+            // =========================
+            // ATTENDANCE VALUES
+            // =========================
 
-            cachedSnapshot.calculationResult.perDaySalary = perDay;
-            cachedSnapshot.calculationResult.grossSalary = gross;
-            cachedSnapshot.calculationResult.netSalary = net;
-            cachedSnapshot.calculationResult.totalDeduction = deductions;
+            cachedSnapshot.attendanceSummary.presentDays =
+                    parseIntValue(
+                            etPresent.getText().toString()
+                    );
 
-            DatabaseReference salaryRef = FirebaseDatabase.getInstance()
-                    .getReference("Companies")
-                    .child(companyKey)
-                    .child("salary")
-                    .child(month)
-                    .child(employeeMobile);
+            cachedSnapshot.attendanceSummary.halfDays =
+                    parseIntValue(
+                            etHalf.getText().toString()
+                    );
+
+            cachedSnapshot.attendanceSummary.absentDays =
+                    parseIntValue(
+                            etAbsent.getText().toString()
+                    );
+
+            cachedSnapshot.attendanceSummary.lateCount =
+                    parseIntValue(
+                            etLate.getText().toString()
+                    );
+
+
+            // =========================
+            // SALARY VALUES
+            // =========================
+
+            double perDay =
+                    parseDoubleValue(
+                            etPerDay.getText().toString()
+                    );
+
+            double deductions =
+                    parseDoubleValue(
+                            etDeductions.getText().toString()
+                    );
+
+            double payableDays =
+                    cachedSnapshot.calculationResult.payableDays;
+
+            double gross =
+                    payableDays * perDay;
+
+            double net =
+                    Math.max(
+                            0,
+                            gross - deductions
+                    );
+
+
+            cachedSnapshot.calculationResult.perDaySalary =
+                    perDay;
+
+            cachedSnapshot.calculationResult.grossSalary =
+                    gross;
+
+            cachedSnapshot.calculationResult.totalDeduction =
+                    deductions;
+
+            cachedSnapshot.calculationResult.netSalary =
+                    net;
+
+
+            // =========================
+            // SAVE FIREBASE
+            // =========================
+
+            DatabaseReference salaryRef =
+                    FirebaseDatabase.getInstance()
+                            .getReference("Companies")
+                            .child(companyKey)
+                            .child("salary")
+                            .child(month)
+                            .child(employeeMobile);
 
             salaryRef.setValue(cachedSnapshot)
-                    .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(this, "Salary updated successfully", Toast.LENGTH_SHORT).show();
-                        toggleEditMode();
+                    .addOnSuccessListener(unused -> {
+
+                        Toast.makeText(
+                                this,
+                                "Salary updated successfully",
+                                Toast.LENGTH_SHORT
+                        ).show();
+
+                        isEditMode = false;
+                        setEditableMode(false);
+
+                        btnEdit.setText("Edit");
+                        btnSave.setVisibility(View.GONE);
+
+                        bindData(cachedSnapshot);
                     })
                     .addOnFailureListener(e -> {
-                        Toast.makeText(this, "Failed to save: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+
+                        Toast.makeText(
+                                this,
+                                "Failed to save: "
+                                        + e.getMessage(),
+                                Toast.LENGTH_LONG
+                        ).show();
                     });
 
         } catch (Exception e) {
-            Toast.makeText(this, "Invalid data: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+
+            Toast.makeText(
+                    this,
+                    "Invalid salary data: "
+                            + e.getMessage(),
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
+
 
     private void fetchCompanyInfo() {
         DatabaseReference companyRef = FirebaseDatabase.getInstance()
@@ -1010,41 +1242,188 @@ public class SalaryDetailActivity extends AppCompatActivity {
     }
 
     private void bindData(SalarySnapshot s) {
-        tvEmployeeMobile.setText(s.employeeMobile);
-        tvMonth.setText(s.month);
 
-        // Display employee ID if available
-        if (employeeId != null && !employeeId.equals("N/A")) {
-            tvEmployeeName.setText(employeeName + " (ID: " + employeeId + ")");
-        } else {
-            tvEmployeeName.setText(employeeName);
+        if (s == null) {
+            return;
         }
 
-        NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("en", "IN"));
+        tvEmployeeMobile.setText(
+                s.employeeMobile != null
+                        ? s.employeeMobile
+                        : employeeMobile
+        );
+
+        tvMonth.setText(
+                s.month != null
+                        ? s.month
+                        : month
+        );
+
+        NumberFormat formatter =
+                NumberFormat.getCurrencyInstance(
+                        new Locale("en", "IN")
+                );
+
+        // =========================
+        // ATTENDANCE
+        // =========================
 
         if (s.attendanceSummary != null) {
-            etPresent.setText(String.valueOf(s.attendanceSummary.presentDays));
-            etHalf.setText(String.valueOf(s.attendanceSummary.halfDays));
-            etAbsent.setText(String.valueOf(s.attendanceSummary.absentDays));
-            etLate.setText(String.valueOf(s.attendanceSummary.lateCount));
+
+            etPresent.setText(
+                    String.valueOf(
+                            s.attendanceSummary.presentDays
+                    )
+            );
+
+            etHalf.setText(
+                    String.valueOf(
+                            s.attendanceSummary.halfDays
+                    )
+            );
+
+            etAbsent.setText(
+                    String.valueOf(
+                            s.attendanceSummary.absentDays
+                    )
+            );
+
+            etLate.setText(
+                    String.valueOf(
+                            s.attendanceSummary.lateCount
+                    )
+            );
+
+        } else {
+
+            etPresent.setText("0");
+            etHalf.setText("0");
+            etAbsent.setText("0");
+            etLate.setText("0");
         }
+
+        // =========================
+        // CONFIGURED WORKING DAYS
+        // =========================
+
+        int workingDaysToShow = configuredWorkingDays;
+
+        if (s.salaryConfigSnapshot != null
+                && s.salaryConfigSnapshot.workingDays > 0) {
+
+            workingDaysToShow =
+                    s.salaryConfigSnapshot.workingDays;
+        }
+
+        tvWorkingDays.setText(
+                String.valueOf(workingDaysToShow)
+        );
+
+        // =========================
+        // SALARY
+        // =========================
 
         if (s.calculationResult != null) {
-            double perDay = parseSalaryValue(s.calculationResult.perDaySalary);
-            double gross = parseSalaryValue(s.calculationResult.grossSalary);
-            double net = parseSalaryValue(s.calculationResult.netSalary);
-            double deductions = parseSalaryValue(s.calculationResult.totalDeduction);
 
-            if (deductions == 0 && gross > 0 && net > 0) {
-                deductions = gross - net;
-            }
+            // IMPORTANT:
+            // Salary Detail must display ONLY the saved generated salary snapshot.
+            // Do not mix live employee salaryConfig with generated salary result.
 
-            etPerDay.setText(formatter.format(perDay));
-            etGross.setText(formatter.format(gross));
-            etNet.setText(formatter.format(net));
-            etDeductions.setText(formatter.format(deductions));
+            double perDay =
+                    parseSalaryValue(
+                            s.calculationResult.perDaySalary
+                    );
+
+            double gross =
+                    parseSalaryValue(
+                            s.calculationResult.grossSalary
+                    );
+
+            double net =
+                    parseSalaryValue(
+                            s.calculationResult.netSalary
+                    );
+
+            double deductions =
+                    parseSalaryValue(
+                            s.calculationResult.totalDeduction
+                    );
+
+            double payableDays =
+                    s.calculationResult.payableDays;
+
+            // Final Payable Days
+            tvPayableDays.setText(
+                    formatDays(payableDays)
+            );
+
+            // Salary values
+            etPerDay.setText(
+                    formatter.format(perDay)
+            );
+
+            etGross.setText(
+                    formatter.format(gross)
+            );
+
+            etNet.setText(
+                    formatter.format(net)
+            );
+
+            etDeductions.setText(
+                    formatter.format(deductions)
+            );
+
+            android.util.Log.d(
+                    "SALARY_DETAIL",
+                    "Configured Working Days = "
+                            + configuredWorkingDays
+                            + ", Payable Days = "
+                            + payableDays
+                            + ", Per Day = "
+                            + perDay
+                            + ", Gross = "
+                            + gross
+                            + ", Net = "
+                            + net
+            );
+
+        } else {
+
+            tvPayableDays.setText("0");
+
+            etPerDay.setText(
+                    formatter.format(0)
+            );
+
+            etGross.setText(
+                    formatter.format(0)
+            );
+
+            etNet.setText(
+                    formatter.format(0)
+            );
+
+            etDeductions.setText(
+                    formatter.format(0)
+            );
         }
     }
+
+
+    private String formatDays(double days) {
+
+        if (days == Math.floor(days)) {
+            return String.valueOf((int) days);
+        }
+
+        return String.format(
+                Locale.getDefault(),
+                "%.1f",
+                days
+        );
+    }
+
     private double parseSalaryValue(Object value) {
         if (value == null) return 0.0;
         try {
@@ -1294,14 +1673,38 @@ public class SalaryDetailActivity extends AppCompatActivity {
 
         y += 30;
 
-        double workingDays = s.attendanceSummary.presentDays + (s.attendanceSummary.halfDays * 0.5);
+        double payableDays = 0.0;
+
+        if (s.calculationResult != null) {
+            payableDays =
+                    s.calculationResult.payableDays;
+        }
 
         String[][] salaryData = {
-                {"Employee ID", employeeId},
-                {"Per Day Salary", currencyFormat.format(perDay)},
-                {"Total Working Days", String.format("%.1f", workingDays)},
-                {"Gross Salary", currencyFormat.format(gross)},
-                {"Deductions", currencyFormat.format(deductions)}
+                {
+                        "Employee ID",
+                        employeeId
+                },
+                {
+                        "Configured Working Days",
+                        String.valueOf(configuredWorkingDays)
+                },
+                {
+                        "Per Day Salary",
+                        currencyFormat.format(perDay)
+                },
+                {
+                        "Final Payable Days",
+                        formatDays(payableDays)
+                },
+                {
+                        "Gross Salary",
+                        currencyFormat.format(gross)
+                },
+                {
+                        "Deductions",
+                        currencyFormat.format(deductions)
+                }
         };
 
         for (int i = 0; i < salaryData.length; i++) {

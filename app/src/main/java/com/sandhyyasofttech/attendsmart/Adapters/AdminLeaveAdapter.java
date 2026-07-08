@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH> {
 
@@ -121,11 +123,38 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
                 int allowedPaidLeaves = 0;
 
                 if (snap.exists()) {
+
                     Object val = snap.getValue();
-                    if (val instanceof Long) {
-                        allowedPaidLeaves = ((Long) val).intValue();
+
+                    if (val instanceof Number) {
+
+                        // Firebase Long / Double / Integer sagle safe
+                        allowedPaidLeaves =
+                                ((Number) val).intValue();
+
                     } else if (val instanceof String) {
-                        allowedPaidLeaves = Integer.parseInt((String) val);
+
+                        String value =
+                                ((String) val).trim();
+
+                        if (!value.isEmpty()) {
+                            try {
+                                allowedPaidLeaves =
+                                        (int) Double.parseDouble(value);
+
+                            } catch (NumberFormatException e) {
+
+                                allowedPaidLeaves = 0;
+
+                                android.util.Log.e(
+                                        "LEAVE_DEBUG",
+                                        "Invalid paidLeaves value: " + value,
+                                        e
+                                );
+                            }
+                        } else {
+                            allowedPaidLeaves = 0;
+                        }
                     }
                 }
 
@@ -140,84 +169,818 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
     }
 
     // ✅ COUNT USED PAID LEAVES (CURRENT MONTH ONLY)
-    private void countUsedPaidLeaves(LeaveModel m, int allowedPaidLeaves) {
-        Query q = leavesRef.orderByChild("employeeMobile")
-                .equalTo(m.employeeMobile);
+// ✅ COUNT USED PAID LEAVES
+// Request chya leave month nusar count hoil
+    private void countUsedPaidLeaves(
+            LeaveModel currentLeave,
+            int allowedPaidLeaves
+    ) {
+
+        Query q = leavesRef
+                .orderByChild("employeeMobile")
+                .equalTo(currentLeave.employeeMobile);
 
         q.addListenerForSingleValueEvent(new ValueEventListener() {
+
             @Override
             public void onDataChange(@NonNull DataSnapshot snap) {
-                double usedPaidLeaves = 0;
-                Calendar now = Calendar.getInstance();
 
-                for (DataSnapshot d : snap.getChildren()) {
-                    LeaveModel lm = d.getValue(LeaveModel.class);
-                    if (lm == null) continue;
+                double usedPaidLeaves = 0.0;
 
-                    // Skip current leave being approved
-                    if (lm.leaveId != null && lm.leaveId.equals(m.leaveId)) continue;
+                try {
 
-                    if (!"APPROVED".equals(lm.status)) continue;
-                    if (!Boolean.TRUE.equals(lm.isPaid)) continue;
-                    if (lm.approvedAt == null) continue;
+                    SimpleDateFormat sdf =
+                            new SimpleDateFormat(
+                                    "yyyy-MM-dd",
+                                    Locale.getDefault()
+                            );
 
-                    // ✅ Check if leave is in current month
-                    Calendar cal = Calendar.getInstance();
-                    cal.setTimeInMillis(lm.approvedAt);
+                    // Current request kontya month/year chi aahe
+                    Date currentFromDate =
+                            sdf.parse(currentLeave.fromDate);
 
-                    boolean sameMonth =
-                            cal.get(Calendar.MONTH) == now.get(Calendar.MONTH) &&
-                                    cal.get(Calendar.YEAR) == now.get(Calendar.YEAR);
-
-                    if (sameMonth) {
-                        usedPaidLeaves += calculateLeaveDays(lm);
+                    if (currentFromDate == null) {
+                        showDecisionDialog(
+                                currentLeave,
+                                allowedPaidLeaves,
+                                0
+                        );
+                        return;
                     }
-                }
 
-                showDecisionDialog(m, allowedPaidLeaves, usedPaidLeaves);
+                    Calendar requestCal = Calendar.getInstance();
+                    requestCal.setTime(currentFromDate);
+
+                    int requestMonth =
+                            requestCal.get(Calendar.MONTH);
+
+                    int requestYear =
+                            requestCal.get(Calendar.YEAR);
+
+
+                    // Employee chya approved leaves check
+                    for (DataSnapshot d : snap.getChildren()) {
+
+                        LeaveModel lm =
+                                d.getValue(LeaveModel.class);
+
+                        if (lm == null) continue;
+
+                        // Firebase key set kar
+                        lm.leaveId = d.getKey();
+
+                        // Current leave skip
+                        if (lm.leaveId != null
+                                && lm.leaveId.equals(currentLeave.leaveId)) {
+                            continue;
+                        }
+
+                        // Fakt approved leaves
+                        if (!"APPROVED".equalsIgnoreCase(
+                                getSafeString(lm.status))) {
+                            continue;
+                        }
+
+                        // fromDate missing asel tar skip
+                        if (lm.fromDate == null
+                                || lm.fromDate.trim().isEmpty()) {
+                            continue;
+                        }
+
+                        Date oldLeaveFrom =
+                                sdf.parse(lm.fromDate);
+
+                        if (oldLeaveFrom == null) continue;
+
+                        Calendar oldLeaveCal =
+                                Calendar.getInstance();
+
+                        oldLeaveCal.setTime(oldLeaveFrom);
+
+                        boolean sameLeaveMonth =
+                                oldLeaveCal.get(Calendar.MONTH)
+                                        == requestMonth
+                                        &&
+                                        oldLeaveCal.get(Calendar.YEAR)
+                                                == requestYear;
+
+                        if (!sameLeaveMonth) {
+                            continue;
+                        }
+
+
+                        // New split records
+                        if (lm.paidDays > 0) {
+
+                            usedPaidLeaves += lm.paidDays;
+
+                        }
+                        // Old records backward compatibility
+                        else if (Boolean.TRUE.equals(lm.isPaid)) {
+
+                            usedPaidLeaves +=
+                                    calculateLeaveDays(lm);
+                        }
+                    }
+
+                    android.util.Log.d(
+                            "LEAVE_BALANCE_DEBUG",
+                            "Employee=" + currentLeave.employeeMobile
+                                    + ", RequestMonth="
+                                    + (requestMonth + 1)
+                                    + "-" + requestYear
+                                    + ", Allowed="
+                                    + allowedPaidLeaves
+                                    + ", Used="
+                                    + usedPaidLeaves
+                    );
+
+                    showDecisionDialog(
+                            currentLeave,
+                            allowedPaidLeaves,
+                            usedPaidLeaves
+                    );
+
+                } catch (Exception e) {
+
+                    android.util.Log.e(
+                            "LEAVE_BALANCE_DEBUG",
+                            "Failed to calculate paid leave balance",
+                            e
+                    );
+
+                    showDecisionDialog(
+                            currentLeave,
+                            allowedPaidLeaves,
+                            0
+                    );
+                }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError e) {
-                Toast.makeText(context, "Error counting leaves", Toast.LENGTH_SHORT).show();
+
+                Toast.makeText(
+                        context,
+                        "Error counting paid leaves: "
+                                + e.getMessage(),
+                        Toast.LENGTH_SHORT
+                ).show();
             }
         });
     }
-
     // ✅ SHOW DECISION DIALOG
-    private void showDecisionDialog(LeaveModel m, int allowed, double used) {
-        double remaining = allowed - used;
+    private void showDecisionDialog(
+            LeaveModel m,
+            int allowed,
+            double used
+    ) {
 
-        // ✅ Calculate days for current leave
-        double currentLeaveDays =
-                calculateLeaveDays(m);
-        String msg = "📊 Leave Balance Information\n\n" +
-                "Paid Leaves Allowed: " + allowed + "\n" +
-                "Already Used: " + used + "\n" +
-                "Remaining: " + remaining + "\n\n" +
-                "Current Request: " + currentLeaveDays + " day(s)\n" +
-                "Employee: " + m.employeeName;
+        // First calculate actual chargeable leave days
+        // Weekly holidays + company holidays will be skipped
+        calculateChargeableLeaveDays(
+                m,
+                chargeableDays -> {
 
-        new AlertDialog.Builder(context)
-                .setTitle("Approve Leave Request")
-                .setMessage(msg)
-                .setPositiveButton("✅ Approve as PAID", (d, w) -> {
-                    if (remaining < currentLeaveDays) {
-                        Toast.makeText(context,
-                                "⚠️ Not enough paid leaves remaining! Only " + remaining + " available.",
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    approveLeave(m, true);
-                })
-                .setNegativeButton("🔴 Approve as UNPAID", (d, w) -> {
-                    approveLeave(m, false);
-                })
-                .setNeutralButton("Cancel", null)
-                .show();
+                    double remaining =
+                            Math.max(0, allowed - used);
+
+                    double requestedDays =
+                            chargeableDays;
+
+                    double paidDays =
+                            Math.min(requestedDays, remaining);
+
+                    double unpaidDays =
+                            Math.max(0, requestedDays - paidDays);
+
+
+                    String msg =
+                            "📊 Leave Balance Information\n\n" +
+
+                                    "Paid Leaves Allowed: "
+                                    + formatDays(allowed) + "\n" +
+
+                                    "Already Used: "
+                                    + formatDays(used) + "\n" +
+
+                                    "Paid Balance: "
+                                    + formatDays(remaining) + "\n\n" +
+
+                                    "📅 Leave Period:\n" +
+                                    getSafeString(m.fromDate)
+                                    + " → "
+                                    + getSafeString(m.toDate)
+                                    + "\n\n" +
+
+                                    "Current Chargeable Leave: "
+                                    + formatDays(requestedDays)
+                                    + " day(s)\n" +
+
+                                    "Employee: "
+                                    + getSafeString(m.employeeName)
+                                    + "\n\n" +
+
+                                    "ℹ️ Weekly holidays and company holidays "
+                                    + "are excluded automatically.\n\n" +
+
+                                    "📌 If approved using Paid/Split:\n" +
+
+                                    "Paid Days: "
+                                    + formatDays(paidDays)
+                                    + "\n" +
+
+                                    "Unpaid Days: "
+                                    + formatDays(unpaidDays);
+
+
+                    AlertDialog dialog =
+                            new AlertDialog.Builder(context)
+                                    .setTitle("Approve Leave Request")
+                                    .setMessage(msg)
+
+                                    .setPositiveButton(
+                                            paidDays > 0
+                                                    ? (
+                                                    unpaidDays > 0
+                                                            ? "✅ Approve SPLIT"
+                                                            : "✅ Approve as PAID"
+                                            )
+                                                    : "No Paid Balance",
+                                            null
+                                    )
+
+                                    .setNegativeButton(
+                                            "🔴 Approve as UNPAID",
+                                            null
+                                    )
+
+                                    .setNeutralButton(
+                                            "Cancel",
+                                            null
+                                    )
+
+                                    .create();
+
+
+                    dialog.setOnShowListener(unused -> {
+
+                        // =========================
+                        // PAID / SPLIT APPROVAL
+                        // =========================
+
+                        dialog.getButton(
+                                        AlertDialog.BUTTON_POSITIVE
+                                )
+                                .setOnClickListener(v -> {
+
+                                    if (requestedDays <= 0) {
+
+                                        Toast.makeText(
+                                                context,
+                                                "No chargeable leave days found. "
+                                                        + "Selected dates may contain only holidays.",
+                                                Toast.LENGTH_LONG
+                                        ).show();
+
+                                        return;
+                                    }
+
+
+                                    if (paidDays <= 0) {
+
+                                        Toast.makeText(
+                                                context,
+                                                "No paid leave balance available",
+                                                Toast.LENGTH_LONG
+                                        ).show();
+
+                                        return;
+                                    }
+
+
+                                    approveLeaveWithSplit(
+                                            m,
+                                            requestedDays,
+                                            paidDays,
+                                            unpaidDays
+                                    );
+
+                                    dialog.dismiss();
+                                });
+
+
+                        // =========================
+                        // FULL UNPAID APPROVAL
+                        // =========================
+
+                        dialog.getButton(
+                                        AlertDialog.BUTTON_NEGATIVE
+                                )
+                                .setOnClickListener(v -> {
+
+                                    if (requestedDays <= 0) {
+
+                                        Toast.makeText(
+                                                context,
+                                                "No chargeable leave days found.",
+                                                Toast.LENGTH_LONG
+                                        ).show();
+
+                                        return;
+                                    }
+
+                                    approveLeaveWithSplit(
+                                            m,
+                                            requestedDays,
+                                            0,
+                                            requestedDays
+                                    );
+
+                                    dialog.dismiss();
+                                });
+
+                    });
+
+                    dialog.show();
+                }
+        );
+    }
+    private interface LeaveDaysCallback {
+        void onResult(double chargeableDays);
     }
 
+    private void calculateChargeableLeaveDays(
+            LeaveModel m,
+            LeaveDaysCallback callback
+    ) {
 
+        String companyKey =
+                new PrefManager(context).getCompanyKey();
+
+        DatabaseReference companyRef =
+                FirebaseDatabase.getInstance()
+                        .getReference("Companies")
+                        .child(companyKey);
+
+        // ==========================================
+        // STEP 1: EMPLOYEE WEEKLY HOLIDAY LOAD
+        // Path:
+        // employees/{mobile}/info/weeklyHoliday
+        // ==========================================
+
+        companyRef
+                .child("employees")
+                .child(m.employeeMobile)
+                .child("info")
+                .child("weeklyHoliday")
+                .addListenerForSingleValueEvent(
+                        new ValueEventListener() {
+
+                            @Override
+                            public void onDataChange(
+                                    @NonNull DataSnapshot weeklySnap
+                            ) {
+
+                                String weeklyHoliday =
+                                        weeklySnap.getValue(String.class);
+
+                                if (weeklyHoliday == null) {
+                                    weeklyHoliday = "";
+                                }
+
+                                weeklyHoliday =
+                                        weeklyHoliday.trim();
+
+                                final String employeeWeeklyHoliday =
+                                        weeklyHoliday;
+
+                                android.util.Log.d(
+                                        "LEAVE_WEEKLY_DEBUG",
+                                        "Employee="
+                                                + m.employeeMobile
+                                                + ", WeeklyHoliday="
+                                                + employeeWeeklyHoliday
+                                );
+
+
+                                // ==========================================
+                                // STEP 2: COMPANY HOLIDAYS LOAD
+                                // ==========================================
+
+                                companyRef
+                                        .child("holidays")
+                                        .addListenerForSingleValueEvent(
+                                                new ValueEventListener() {
+
+                                                    @Override
+                                                    public void onDataChange(
+                                                            @NonNull DataSnapshot holidaysSnap
+                                                    ) {
+
+                                                        try {
+
+                                                            Set<String> companyHolidayDates =
+                                                                    new HashSet<>();
+
+
+                                                            // ==========================================
+                                                            // LOAD COMPANY HOLIDAY DATES
+                                                            // ==========================================
+
+                                                            for (DataSnapshot holidaySnap :
+                                                                    holidaysSnap.getChildren()) {
+
+                                                                // Date as Firebase key
+                                                                String dateKey =
+                                                                        holidaySnap.getKey();
+
+                                                                if (dateKey != null
+                                                                        && !dateKey.trim().isEmpty()) {
+
+                                                                    companyHolidayDates.add(
+                                                                            dateKey.trim()
+                                                                    );
+                                                                }
+
+
+                                                                // Fallback holidayDate field
+                                                                String holidayDate =
+                                                                        holidaySnap
+                                                                                .child("holidayDate")
+                                                                                .getValue(String.class);
+
+                                                                if (holidayDate != null
+                                                                        && !holidayDate.trim().isEmpty()) {
+
+                                                                    companyHolidayDates.add(
+                                                                            holidayDate.trim()
+                                                                    );
+                                                                }
+                                                            }
+
+
+                                                            // ==========================================
+                                                            // STEP 3: DATE PARSE
+                                                            // ==========================================
+
+                                                            SimpleDateFormat sdf =
+                                                                    new SimpleDateFormat(
+                                                                            "yyyy-MM-dd",
+                                                                            Locale.getDefault()
+                                                                    );
+
+                                                            sdf.setLenient(false);
+
+
+                                                            Date fromDate =
+                                                                    sdf.parse(m.fromDate);
+
+                                                            Date toDate =
+                                                                    sdf.parse(m.toDate);
+
+
+                                                            if (fromDate == null
+                                                                    || toDate == null) {
+
+                                                                callback.onResult(0);
+                                                                return;
+                                                            }
+
+
+                                                            if (fromDate.after(toDate)) {
+
+                                                                callback.onResult(0);
+                                                                return;
+                                                            }
+
+
+                                                            // ==========================================
+                                                            // STEP 4: LOOP EACH LEAVE DATE
+                                                            // ==========================================
+
+                                                            Calendar current =
+                                                                    Calendar.getInstance();
+
+                                                            current.setTime(fromDate);
+
+
+                                                            Calendar end =
+                                                                    Calendar.getInstance();
+
+                                                            end.setTime(toDate);
+
+
+                                                            double chargeableDays = 0.0;
+
+                                                            int totalCalendarDays = 0;
+                                                            int weeklyHolidayCount = 0;
+                                                            int companyHolidayCount = 0;
+
+
+                                                            while (!current.after(end)) {
+
+                                                                totalCalendarDays++;
+
+
+                                                                String dateKey =
+                                                                        sdf.format(
+                                                                                current.getTime()
+                                                                        );
+
+
+                                                                // ==========================================
+                                                                // CURRENT DATE DAY NAME
+                                                                // Example:
+                                                                // Sunday / Monday / Saturday
+                                                                // ==========================================
+
+                                                                String currentDayName =
+                                                                        new SimpleDateFormat(
+                                                                                "EEEE",
+                                                                                Locale.ENGLISH
+                                                                        ).format(
+                                                                                current.getTime()
+                                                                        );
+
+
+                                                                // ==========================================
+                                                                // DYNAMIC EMPLOYEE WEEKLY HOLIDAY
+                                                                // ==========================================
+
+                                                                boolean isWeeklyHoliday =
+                                                                        !employeeWeeklyHoliday.isEmpty()
+                                                                                &&
+                                                                                currentDayName.equalsIgnoreCase(
+                                                                                        employeeWeeklyHoliday
+                                                                                );
+
+
+                                                                // ==========================================
+                                                                // COMPANY HOLIDAY
+                                                                // ==========================================
+
+                                                                boolean isCompanyHoliday =
+                                                                        companyHolidayDates.contains(
+                                                                                dateKey
+                                                                        );
+
+
+                                                                // ==========================================
+                                                                // COUNT / SKIP
+                                                                // ==========================================
+
+                                                                if (isWeeklyHoliday) {
+
+                                                                    weeklyHolidayCount++;
+
+                                                                    android.util.Log.d(
+                                                                            "LEAVE_DAY_DEBUG",
+                                                                            "SKIP WEEKLY HOLIDAY"
+                                                                                    + " | Date="
+                                                                                    + dateKey
+                                                                                    + " | Day="
+                                                                                    + currentDayName
+                                                                                    + " | Configured="
+                                                                                    + employeeWeeklyHoliday
+                                                                    );
+
+                                                                } else if (isCompanyHoliday) {
+
+                                                                    companyHolidayCount++;
+
+                                                                    android.util.Log.d(
+                                                                            "LEAVE_DAY_DEBUG",
+                                                                            "SKIP COMPANY HOLIDAY"
+                                                                                    + " | Date="
+                                                                                    + dateKey
+                                                                    );
+
+                                                                } else {
+
+                                                                    // ==========================================
+                                                                    // NORMAL WORKING DAY
+                                                                    // HALF DAY = 0.5
+                                                                    // FULL DAY = 1.0
+                                                                    // ==========================================
+
+                                                                    boolean isHalfDay =
+                                                                            "HALF_DAY".equalsIgnoreCase(
+                                                                                    getSafeString(m.leaveType).trim()
+                                                                            );
+
+                                                                    double dayValue =
+                                                                            isHalfDay ? 0.5 : 1.0;
+
+                                                                    chargeableDays += dayValue;
+
+                                                                    android.util.Log.d(
+                                                                            "LEAVE_DAY_DEBUG",
+                                                                            "COUNT LEAVE DAY"
+                                                                                    + " | Date="
+                                                                                    + dateKey
+                                                                                    + " | Day="
+                                                                                    + currentDayName
+                                                                                    + " | LeaveType="
+                                                                                    + getSafeString(m.leaveType)
+                                                                                    + " | Added="
+                                                                                    + dayValue
+                                                                    );
+                                                                }   
+
+
+                                                                current.add(
+                                                                        Calendar.DAY_OF_MONTH,
+                                                                        1
+                                                                );
+                                                            }
+
+
+                                                            // ==========================================
+                                                            // FINAL DEBUG
+                                                            // ==========================================
+
+                                                            android.util.Log.d(
+                                                                    "LEAVE_CHARGE_DEBUG",
+
+                                                                    "Employee="
+                                                                            + m.employeeMobile +
+
+                                                                            ", WeeklyHoliday="
+                                                                            + employeeWeeklyHoliday +
+
+                                                                            ", From="
+                                                                            + m.fromDate +
+
+                                                                            ", To="
+                                                                            + m.toDate +
+
+                                                                            ", CalendarDays="
+                                                                            + totalCalendarDays +
+
+                                                                            ", WeeklySkipped="
+                                                                            + weeklyHolidayCount +
+
+                                                                            ", CompanySkipped="
+                                                                            + companyHolidayCount +
+
+                                                                            ", ChargeableDays="
+                                                                            + chargeableDays
+                                                            );
+
+
+                                                            callback.onResult(
+                                                                    chargeableDays
+                                                            );
+
+
+                                                        } catch (Exception e) {
+
+                                                            android.util.Log.e(
+                                                                    "LEAVE_CHARGE_DEBUG",
+                                                                    "Failed calculating chargeable leave",
+                                                                    e
+                                                            );
+
+                                                            callback.onResult(0);
+                                                        }
+                                                    }
+
+
+                                                    @Override
+                                                    public void onCancelled(
+                                                            @NonNull DatabaseError error
+                                                    ) {
+
+                                                        android.util.Log.e(
+                                                                "LEAVE_CHARGE_DEBUG",
+                                                                "Holiday load error: "
+                                                                        + error.getMessage()
+                                                        );
+
+                                                        callback.onResult(0);
+                                                    }
+                                                }
+                                        );
+                            }
+
+
+                            @Override
+                            public void onCancelled(
+                                    @NonNull DatabaseError error
+                            ) {
+
+                                android.util.Log.e(
+                                        "LEAVE_WEEKLY_DEBUG",
+                                        "Weekly holiday load error: "
+                                                + error.getMessage()
+                                );
+
+                                callback.onResult(0);
+                            }
+                        }
+                );
+    }
+
+    private void approveLeaveWithSplit(
+            LeaveModel m,
+            double requestedDays,
+            double paidDays,
+            double unpaidDays
+    ) {
+        Map<String, Object> updates = new HashMap<>();
+
+        updates.put("status", "APPROVED");
+
+        // Total approved days
+        updates.put("approvedDays", requestedDays);
+
+        // Exact payroll split
+        updates.put("paidDays", paidDays);
+        updates.put("unpaidDays", unpaidDays);
+
+        // Backward compatibility
+        updates.put("isPaid", paidDays > 0);
+
+        updates.put(
+                "approvalType",
+                unpaidDays > 0 && paidDays > 0
+                        ? "PARTIALLY_PAID"
+                        : paidDays > 0
+                        ? "PAID"
+                        : "UNPAID"
+        );
+
+        updates.put(
+                "approvedAt",
+                System.currentTimeMillis()
+        );
+
+        String adminName =
+                new PrefManager(context).getUserName();
+
+        updates.put(
+                "approvedBy",
+                adminName
+        );
+
+        leavesRef
+                .child(m.leaveId)
+                .updateChildren(updates)
+                .addOnSuccessListener(unused -> {
+
+                    String message;
+
+                    if (paidDays > 0 && unpaidDays > 0) {
+
+                        message =
+                                "Leave Approved\n" +
+                                        formatDays(paidDays) + " Paid + " +
+                                        formatDays(unpaidDays) + " Unpaid";
+
+                    } else if (paidDays > 0) {
+
+                        message =
+                                "Paid Leave Approved: " +
+                                        formatDays(paidDays) + " day(s)";
+
+                    } else {
+
+                        message =
+                                "Unpaid Leave Approved: " +
+                                        formatDays(unpaidDays) + " day(s)";
+                    }
+
+                    Toast.makeText(
+                            context,
+                            message,
+                            Toast.LENGTH_LONG
+                    ).show();
+
+                })
+                .addOnFailureListener(e ->
+
+                        Toast.makeText(
+                                context,
+                                "Failed to approve leave: "
+                                        + e.getMessage(),
+                                Toast.LENGTH_LONG
+                        ).show()
+                );
+    }
+
+    private String formatDays(double value) {
+
+        if (value == Math.floor(value)) {
+            return String.valueOf((int) value);
+        }
+
+        return String.format(
+                Locale.getDefault(),
+                "%.1f",
+                value
+        );
+    }
 
     private double calculateLeaveDays(LeaveModel m) {
 
@@ -246,6 +1009,7 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
             return 1;
         }
     }
+
     // ✅ APPROVE LEAVE
     private void approveLeave(LeaveModel m, boolean isPaid) {
         Map<String, Object> map = new HashMap<>();
@@ -267,6 +1031,7 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
                     Toast.makeText(context, "❌ Failed to approve leave", Toast.LENGTH_SHORT).show();
                 });
     }
+
 
     // ✅ REJECT LEAVE
     private void showRejectDialog(String leaveId) {
@@ -306,10 +1071,12 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
                 .show();
     }
 
+
     @Override
     public int getItemCount() {
         return list.size();
     }
+
 
     static class VH extends RecyclerView.ViewHolder {
         TextView tvName, tvDates, tvReason, tvStatus;
@@ -334,4 +1101,5 @@ public class AdminLeaveAdapter extends RecyclerView.Adapter<AdminLeaveAdapter.VH
             if (btnReject == null) android.util.Log.e("AdminLeaveAdapter", "❌ btnReject is NULL!");
         }
     }
+
 }

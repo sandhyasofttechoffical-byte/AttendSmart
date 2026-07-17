@@ -209,6 +209,108 @@ await saveNotification(companyKey, {
       }
     });
   }
-);
+);/**
+   * 🔔 AUTO MARK ABSENT
+   * Runs every day at 12:10 AM (Asia/Kolkata)
+   */
+  exports.markAbsentEmployees = onSchedule(
+    {
+      schedule: "10 0 * * *", // 12:10 AM every day
+      timeZone: "Asia/Kolkata",
+      region: "us-central1",
+    },
+    async () => {
+      try {
+        const db = admin.database();
 
+        // Get yesterday's date in India timezone
+        const now = new Date();
+        const indiaNow = new Date(
+          now.toLocaleString("en-US", {
+            timeZone: "Asia/Kolkata",
+          })
+        );
+
+        indiaNow.setDate(indiaNow.getDate() - 1);
+
+        const attendanceDate = indiaNow
+          .toISOString()
+          .split("T")[0];
+
+        console.log(
+          `Checking attendance for ${attendanceDate}`
+        );
+
+        const companiesSnap = await db
+          .ref("Companies")
+          .once("value");
+
+        if (!companiesSnap.exists()) {
+          console.log("No companies found.");
+          return;
+        }
+
+        const companies = companiesSnap.val();
+
+        for (const companyKey of Object.keys(companies)) {
+
+          const attendanceRef = db.ref(
+            `Companies/${companyKey}/attendance/${attendanceDate}`
+          );
+
+          const attendanceSnap = await attendanceRef.once("value");
+
+          if (!attendanceSnap.exists()) {
+            continue;
+          }
+
+          const employees = attendanceSnap.val();
+
+          for (const employeeMobile of Object.keys(employees)) {
+
+            const employee = employees[employeeMobile];
+
+            const hasCheckIn =
+              employee.checkInTime &&
+              employee.checkInTime.trim() !== "";
+
+            const hasCheckOut =
+              employee.checkOutTime &&
+              employee.checkOutTime.trim() !== "";
+
+            const alreadyAbsent =
+              employee.finalStatus === "Absent";
+
+            if (
+              hasCheckIn &&
+              !hasCheckOut &&
+              !alreadyAbsent
+            ) {
+
+              await attendanceRef
+                .child(employeeMobile)
+                .update({
+                  status: "Absent",
+                  finalStatus: "Absent",
+                  totalMinutes: 0,
+                  totalHours: "0",
+                });
+
+              console.log(
+                `Marked Absent -> Company: ${companyKey}, Employee: ${employeeMobile}`
+              );
+            }
+          }
+        }
+
+        console.log("Auto absent process completed successfully.");
+
+      } catch (error) {
+        console.error(
+          "Auto absent scheduler failed:",
+          error
+        );
+      }
+    }
+  );
 

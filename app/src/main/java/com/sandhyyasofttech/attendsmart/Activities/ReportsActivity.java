@@ -1333,7 +1333,10 @@ public class ReportsActivity extends AppCompatActivity {
                         }
 
                         // Check if it has check-in time or is marked as present/half day
-                        boolean hasCheckIn = record.checkInTime != null && !record.checkInTime.isEmpty();
+                        boolean hasCheckIn =
+                                record.checkInTime != null
+                                        && !record.checkInTime.isEmpty()
+                                        && !record.autoMarkedAbsent;
                         boolean countedPresent = false;
 
                         // ✅ PRESENT (base condition) - SAME LOGIC
@@ -1439,7 +1442,7 @@ public class ReportsActivity extends AppCompatActivity {
         record.markedBy = getStringValue(empSnapshot, "markedBy");
         record.checkInAddress = getStringValue(empSnapshot, "checkInAddress");
         record.lateStatus = getStringValue(empSnapshot, "lateStatus");
-
+        record.autoMarkedAbsent = Boolean.TRUE.equals(empSnapshot.child("autoMarkedAbsent").getValue(Boolean.class));
         // DETERMINE STATUS - THIS IS THE CRITICAL PART
         String status = getStringValue(empSnapshot, "finalStatus");
         if (status == null || status.isEmpty()) {
@@ -1543,7 +1546,10 @@ public class ReportsActivity extends AppCompatActivity {
                         }
 
                         // Check if it has check-in time or is marked as present/half day
-                        boolean hasCheckIn = record.checkInTime != null && !record.checkInTime.isEmpty();
+                        boolean hasCheckIn =
+                                record.checkInTime != null
+                                        && !record.checkInTime.isEmpty()
+                                        && !record.autoMarkedAbsent;
                         boolean countedPresent = false;
 
                         // ✅ PRESENT (base condition) - SAME LOGIC
@@ -1670,7 +1676,17 @@ public class ReportsActivity extends AppCompatActivity {
     }
 
     private static class AttendanceRecord {
-        String date, phone, employeeName, status, lateStatus, markedBy, checkInTime, checkOutTime, checkInAddress;
+        String date;
+        String phone;
+        String employeeName;
+        String status;
+        String lateStatus;
+        String markedBy;
+        String checkInTime;
+        String checkOutTime;
+        String checkInAddress;
+
+        boolean autoMarkedAbsent = false;
     }
 
     private static class EmployeeMonthlySummary {

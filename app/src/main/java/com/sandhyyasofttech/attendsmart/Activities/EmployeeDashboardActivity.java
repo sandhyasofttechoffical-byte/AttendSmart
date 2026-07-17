@@ -922,16 +922,32 @@ public class EmployeeDashboardActivity extends AppCompatActivity {
                                 String markedBy = empData.child("markedBy").getValue(String.class);
                                 Long minutes = empData.child("totalMinutes").getValue(Long.class);
 
+                                // ⭐ NEW CODE: Read autoMarkedAbsent flag
+                                Boolean autoMarkedAbsent = empData.child("autoMarkedAbsent").getValue(Boolean.class);
+                                String absentReason = empData.child("absentReason").getValue(String.class);
+
                                 String effectiveStatus = (finalStatus != null) ? finalStatus : status;
 
                                 if (effectiveStatus != null) {
+                                    // ⭐ MODIFIED: Added autoMarkedAbsent to log
                                     Log.d("ATTENDANCE_DEBUG", "Date: " + dateKey +
                                             ", Status: " + effectiveStatus +
-                                            ", LateStatus: " + lateStatus);
+                                            ", LateStatus: " + lateStatus +
+                                            ", autoMarkedAbsent: " + autoMarkedAbsent);
 
                                     // Remove this date from workingDatesInMonth (it has attendance)
                                     workingDatesInMonth.remove(dateKey);
 
+                                    // ⭐ NEW CODE: Check if auto-marked absent
+                                    if (autoMarkedAbsent != null && autoMarkedAbsent) {
+                                        // Auto-marked absent by Cloud Function - Count as Absent everywhere
+                                        absentCount++;
+                                        absentDays++;
+                                        Log.d("AUTO_ABSENT_DEBUG", "Date " + dateKey + " auto-marked absent. Reason: " + absentReason);
+                                        continue; // Skip any other processing for this date
+                                    }
+
+                                    // ⭐ ALL ORIGINAL CODE CONTINUES BELOW - NOTHING REMOVED ⭐
                                     String statusLower = effectiveStatus.toLowerCase();
 
                                     // Count for charts - handle both half day and late properly

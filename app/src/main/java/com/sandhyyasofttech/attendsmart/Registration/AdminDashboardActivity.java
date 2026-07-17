@@ -17,7 +17,10 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import com.github.mikephil.charting.charts.PieChart;
+import com.github.mikephil.charting.data.PieData;
+import com.github.mikephil.charting.data.PieDataSet;
+import com.github.mikephil.charting.data.PieEntry;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
@@ -99,7 +102,10 @@ public class AdminDashboardActivity extends AppCompatActivity {
     private ExtendedFloatingActionButton fabAddEmployee;
     private Menu navMenu;
     private MenuItem navLeavesItem;
-
+    private PieChart donutTotal;
+    private PieChart donutPresent;
+    private PieChart donutAbsent;
+    private PieChart donutLate;
     // New UI Components
     private ImageView btnMenu, btnSettings, btnNotifications;
     private TextView tvNotificationBadge;
@@ -408,7 +414,10 @@ public class AdminDashboardActivity extends AppCompatActivity {
         chipViewReports = findViewById(R.id.chipViewReports);
         chipQuickActions = findViewById(R.id.chipQuickActions);
         tvViewAllEmployees = findViewById(R.id.tvViewAllEmployees);
-
+        donutTotal = findViewById(R.id.donutTotal);
+        donutPresent = findViewById(R.id.donutPresent);
+        donutAbsent = findViewById(R.id.donutAbsent);
+        donutLate = findViewById(R.id.donutLate);
         tvTotalEmployees = findViewById(R.id.tvTotalEmployees);
         tvPresent = findViewById(R.id.tvPresent);
         tvAbsent = findViewById(R.id.tvAbsent);
@@ -509,6 +518,16 @@ public class AdminDashboardActivity extends AppCompatActivity {
                             int present = 0;
 
                             for (DataSnapshot att : attSnapshot.getChildren()) {
+
+                                // Only skip employees that were auto-marked absent by the Cloud Function
+                                Boolean autoMarkedAbsent =
+                                        att.child("autoMarkedAbsent").getValue(Boolean.class);
+
+                                if (Boolean.TRUE.equals(autoMarkedAbsent)) {
+                                    continue;
+                                }
+
+                                // Keep the original logic exactly as it was
                                 if (att.hasChild("checkInTime")) {
                                     present++;
                                 }
@@ -533,7 +552,37 @@ public class AdminDashboardActivity extends AppCompatActivity {
             });
         }
     }
+    private void setDonutChart(PieChart chart, int value, int total, int color){
 
+        ArrayList<PieEntry> entries = new ArrayList<>();
+
+        entries.add(new PieEntry(value));
+        entries.add(new PieEntry(Math.max(total - value,0)));
+
+        PieDataSet dataSet = new PieDataSet(entries,"");
+
+        dataSet.setColors(color, Color.parseColor("#E5E7EB"));
+        dataSet.setDrawValues(false);
+
+        PieData data = new PieData(dataSet);
+
+        chart.setData(data);
+
+        chart.setUsePercentValues(false);
+        chart.getDescription().setEnabled(false);
+        chart.getLegend().setEnabled(false);
+        chart.setDrawEntryLabels(false);
+
+        chart.setDrawHoleEnabled(true);
+        chart.setHoleRadius(75f);
+        chart.setTransparentCircleRadius(0f);
+
+        chart.setRotationEnabled(false);
+
+        chart.animateY(1200);
+
+        chart.invalidate();
+    }
     private void updateWeeklyChart(List<BarEntry> presentEntries, List<BarEntry> absentEntries) {
         BarDataSet presentDataSet = new BarDataSet(presentEntries, "Present");
         presentDataSet.setColor(Color.parseColor("#4CAF50"));
@@ -1235,12 +1284,17 @@ public class AdminDashboardActivity extends AppCompatActivity {
         });
     }
     private void updateDashboardUI(int total, int present, int absent, int late) {
+
         tvTotalEmployees.setText(String.valueOf(total));
         tvPresent.setText(String.valueOf(present));
         tvAbsent.setText(String.valueOf(absent));
         tvLate.setText(String.valueOf(late));
-    }
 
+        setDonutChart(donutTotal,total,total,Color.parseColor("#2563EB"));
+        setDonutChart(donutPresent,present,total,Color.parseColor("#22C55E"));
+        setDonutChart(donutAbsent,absent,total,Color.parseColor("#EF4444"));
+        setDonutChart(donutLate,late,total,Color.parseColor("#F59E0B"));
+    }
     private void showLogoutConfirmation() {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Logout")

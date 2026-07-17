@@ -307,7 +307,34 @@ public class AdminEmployeeAttendanceActivity extends AppCompatActivity {
                                    final int[] present, final int[] late,
                                    final int[] halfDay, final int[] absent, final int[] checks) {
 
-        if (snapshot.exists()) {
+        if (snapshot.exists())
+
+        {
+            // =====================================
+// CLOUD FUNCTION AUTO ABSENT (NEW)
+// =====================================
+            Boolean autoMarkedAbsent =
+                    snapshot.child("autoMarkedAbsent").getValue(Boolean.class);
+
+            if (Boolean.TRUE.equals(autoMarkedAbsent)) {
+
+                absent[0]++;
+
+                checks[0]--;
+
+                if (checks[0] == 0) {
+                    finishCalculation(
+                            present[0],
+                            late[0],
+                            halfDay[0],
+                            absent[0]
+                    );
+                }
+
+                return;
+            }
+
+
             String status = snapshot.child("status").getValue(String.class);
             String lateStatus = snapshot.child("lateStatus").getValue(String.class);
             String checkInTime = snapshot.child("checkInTime").getValue(String.class);
@@ -544,6 +571,18 @@ public class AdminEmployeeAttendanceActivity extends AppCompatActivity {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     if (snapshot.exists()) {
+                        // =====================================
+// CLOUD FUNCTION AUTO ABSENT (NEW)
+// =====================================
+                        Boolean autoMarkedAbsent =
+                                snapshot.child("autoMarkedAbsent").getValue(Boolean.class);
+
+                        if (Boolean.TRUE.equals(autoMarkedAbsent)) {
+
+                            holder.containerDay.setBackgroundResource(R.drawable.calendar_bg_red);
+                            holder.tvDay.setTextColor(Color.WHITE);
+                            return;
+                        }
                         String status = snapshot.child("status").getValue(String.class);
                         String lateStatus = snapshot.child("lateStatus").getValue(String.class);
                         String checkInTime = snapshot.child("checkInTime").getValue(String.class);

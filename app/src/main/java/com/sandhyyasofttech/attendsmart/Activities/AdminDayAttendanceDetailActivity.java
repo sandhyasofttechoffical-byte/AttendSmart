@@ -735,6 +735,15 @@ public class AdminDayAttendanceDetailActivity extends AppCompatActivity {
             map.put("markedBy", "Admin");
             map.put("lastModified", System.currentTimeMillis());
 
+// =====================================
+// CLEAR CLOUD FUNCTION FLAGS
+// =====================================
+            map.put("autoMarkedAbsent", null);
+
+// Remove Cloud Function metadata
+            map.put("absentReason", null);
+            map.put("autoMarkedAt", null);
+
             btnSave.setEnabled(false);
 
             // Save main data first

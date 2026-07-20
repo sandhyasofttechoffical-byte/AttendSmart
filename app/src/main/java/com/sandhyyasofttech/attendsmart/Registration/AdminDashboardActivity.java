@@ -433,7 +433,7 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
         rvEmployees = findViewById(R.id.rvEmployees);
         rvEmployees.setLayoutManager(new LinearLayoutManager(this));
-        rvEmployees.setHasFixedSize(true);
+//        rvEmployees.setHasFixedSize(true);
 
         employeeList = new ArrayList<>();
         fullEmployeeList = new ArrayList<>();

@@ -111,8 +111,9 @@ public class LoginActivity extends AppCompatActivity {
                             String storedPassword = passwordObj != null ? passwordObj.toString() : null;
                             String status = statusObj != null ? statusObj.toString() : null;
 
-                            if ("ACTIVE".equals(status)) {
-                                PrefManager prefManager = new PrefManager(LoginActivity.this);
+                            if (storedPassword != null
+                                    && storedPassword.equals(password)
+                                    && "ACTIVE".equals(status)) {                                PrefManager prefManager = new PrefManager(LoginActivity.this);
                                 prefManager.saveUserEmail(email);  // ✅ Admin email
                                 prefManager.saveUserType("ADMIN");
                                 prefManager.saveCompanyKey(companyKey);

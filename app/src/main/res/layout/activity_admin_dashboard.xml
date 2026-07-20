@@ -164,7 +164,6 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
-                                    android:fontFamily="@font/poppins_regular"
                                     android:textColor="@color/white"
 
                                     android:text="Monday, Feb 02, 2026"
@@ -191,7 +190,6 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
-                                    android:fontFamily="@font/poppins_regular"
                                     android:textColor="@color/white"
                                     android:text="09:30 AM"
                                     android:textSize="13sp" />
@@ -628,7 +626,6 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:fontFamily="@font/poppins_regular"
                                     android:text="Avg Check-In"
                                     android:textColor="@color/grey_600"
                                     android:textSize="12sp" />
@@ -667,7 +664,6 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:fontFamily="@font/poppins_regular"
                                     android:text="Total Hours"
                                     android:textColor="@color/grey_600"
                                     android:textSize="12sp" />
@@ -705,7 +701,6 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:fontFamily="@font/poppins_regular"
                                     android:text="On-Time Rate"
                                     android:textColor="@color/grey_600"
                                     android:textSize="12sp" />
@@ -804,7 +799,6 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:background="@android:color/transparent"
-                            android:fontFamily="@font/poppins_regular"
                             android:imeOptions="actionSearch"
                             android:inputType="text"
                             android:maxLines="1"

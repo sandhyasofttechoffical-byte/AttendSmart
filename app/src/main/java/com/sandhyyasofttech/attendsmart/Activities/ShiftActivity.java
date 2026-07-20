@@ -113,7 +113,7 @@ public class ShiftActivity extends AppCompatActivity {
         if (rvShifts != null) {
             rvShifts.setLayoutManager(new LinearLayoutManager(this));
             rvShifts.setAdapter(shiftAdapter);
-            rvShifts.setHasFixedSize(true);
+//            rvShifts.setHasFixedSize(true);
         }
     }
 

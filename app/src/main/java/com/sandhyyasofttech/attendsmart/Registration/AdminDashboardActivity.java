@@ -561,8 +561,12 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
         PieDataSet dataSet = new PieDataSet(entries,"");
 
-        dataSet.setColors(color, Color.parseColor("#E5E7EB"));
+        dataSet.setColors(color, Color.parseColor("#EEF1F5"));
         dataSet.setDrawValues(false);
+        // ✅ Small gap between the filled and empty slice for a cleaner, more polished ring
+        dataSet.setSliceSpace(3f);
+        // ✅ Prevent slices from "popping out" on tap/highlight — keeps it looking like a static stat, not a chart to interact with
+        dataSet.setSelectionShift(0f);
 
         PieData data = new PieData(dataSet);
 
@@ -572,14 +576,28 @@ public class AdminDashboardActivity extends AppCompatActivity {
         chart.getDescription().setEnabled(false);
         chart.getLegend().setEnabled(false);
         chart.setDrawEntryLabels(false);
-
-        chart.setDrawHoleEnabled(true);
-        chart.setHoleRadius(75f);
-        chart.setTransparentCircleRadius(0f);
-
+        chart.setHighlightPerTapEnabled(false);
         chart.setRotationEnabled(false);
 
-        chart.animateY(1200);
+        chart.setDrawHoleEnabled(true);
+        chart.setHoleColor(Color.WHITE);
+        chart.setHoleRadius(80f);
+        // ✅ Soft transparent "glow" ring in the stat's own color, instead of a flat empty gap —
+        // this is what makes native dashboard donuts (e.g. fintech apps) look intentional rather than default
+        chart.setTransparentCircleColor(color);
+        chart.setTransparentCircleAlpha(35);
+        chart.setTransparentCircleRadius(86f);
+
+        // ✅ Center readout — a bare ring means nothing at a glance; the % makes the chart self-explanatory
+        int percent = total > 0 ? Math.round((value * 100f) / total) : 0;
+        chart.setDrawCenterText(true);
+        chart.setCenterText(percent + "%");
+        chart.setCenterTextSize(13f);
+        chart.setCenterTextColor(Color.parseColor("#1E293B"));
+        chart.setCenterTextTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+
+        // ✅ Smoother, slightly eased animation instead of the default linear fill
+        chart.animateY(900, com.github.mikephil.charting.animation.Easing.EaseInOutQuad);
 
         chart.invalidate();
     }

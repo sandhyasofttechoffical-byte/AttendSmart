@@ -6,6 +6,7 @@ import android.graphics.Color;
 
 import android.os.Bundle;
 
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,11 +14,13 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.NumberPicker;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -70,6 +73,12 @@ public class AdminEmployeeAttendanceActivity extends AppCompatActivity {
     private int monthlyLateDays = 0;
     private int monthlyHalfDayDays = 0;
     private int monthlyAbsentDays = 0;
+
+    // ✅ Month names for the picker dialog
+    private static final String[] MONTH_NAMES = {
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+    };
 
 
     @Override
@@ -203,6 +212,62 @@ public class AdminEmployeeAttendanceActivity extends AppCompatActivity {
             calendarAdapter.updateMonth(currentMonth);
             calculateMonthlyStats();
         });
+
+        // ✅ Tap the month/year label to jump directly to any month & year
+        tvMonthYear.setOnClickListener(v -> showMonthYearPickerDialog());
+    }
+
+    /**
+     * ✅ NEW: Month & Year picker dialog, built programmatically (no new XML needed).
+     * Lets the admin jump straight to any month/year instead of stepping one at a time.
+     */
+    private void showMonthYearPickerDialog() {
+        if (currentMonth == null) return; // calendar not ready yet
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.HORIZONTAL);
+        container.setGravity(Gravity.CENTER);
+        int padding = (int) (16 * getResources().getDisplayMetrics().density);
+        container.setPadding(padding, padding, padding, padding);
+
+        // Month picker
+        NumberPicker monthPicker = new NumberPicker(this);
+        monthPicker.setMinValue(0);
+        monthPicker.setMaxValue(11);
+        monthPicker.setDisplayedValues(MONTH_NAMES);
+        monthPicker.setValue(currentMonth.get(Calendar.MONTH));
+        monthPicker.setWrapSelectorWheel(true);
+
+        // Year picker (10 years back / 10 years forward from today)
+        NumberPicker yearPicker = new NumberPicker(this);
+        int thisYear = Calendar.getInstance().get(Calendar.YEAR);
+        yearPicker.setMinValue(thisYear - 10);
+        yearPicker.setMaxValue(thisYear + 10);
+        yearPicker.setValue(currentMonth.get(Calendar.YEAR));
+        yearPicker.setWrapSelectorWheel(false);
+
+        LinearLayout.LayoutParams pickerParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        int sideMargin = (int) (8 * getResources().getDisplayMetrics().density);
+        pickerParams.setMargins(sideMargin, 0, sideMargin, 0);
+
+        container.addView(monthPicker, pickerParams);
+        container.addView(yearPicker, pickerParams);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Select Month & Year")
+                .setView(container)
+                .setPositiveButton("OK", (dialog, which) -> {
+                    currentMonth.set(Calendar.YEAR, yearPicker.getValue());
+                    currentMonth.set(Calendar.MONTH, monthPicker.getValue());
+                    currentMonth.set(Calendar.DAY_OF_MONTH, 1);
+
+                    updateMonthDisplay();
+                    calendarAdapter.updateMonth(currentMonth);
+                    calculateMonthlyStats();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void setupFirebase() {
